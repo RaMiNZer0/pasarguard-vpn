@@ -315,20 +315,22 @@ class VPNEngine:
 
 
 class OpenVPNClientConfigGenerator:
-    """تولیدکننده استاندارد فایل‌های تک‌فایلی .ovpn با قابلیت اتصال دوگانه TCP 443 و UDP 1194"""
+    """تولیدکننده استاندارد فایل‌های تک‌فایلی .ovpn با قابلیت اتصال دوگانه TCP 443 و UDP 1194 و استتار tls-crypt"""
 
     def __init__(
         self,
         server_host: str,
-        server_port: int = 443,
+        server_port: int = 1194,
         proto: str = "tcp",
         ca_cert: str = "",
+        tls_crypt_key: str = "",
         cipher: str = "AES-256-GCM",
     ) -> None:
         self.server_host = server_host
         self.server_port = server_port
         self.proto = proto
         self.ca_cert = ca_cert.strip()
+        self.tls_crypt_key = tls_crypt_key.strip()
         self.cipher = cipher
 
     def generate(self, node_name: str = "PasarGuard-Node") -> str:
@@ -336,6 +338,10 @@ class OpenVPNClientConfigGenerator:
             remotes = f"remote {self.server_host} {self.server_port}\nremote {self.server_host} 443 tcp"
         else:
             remotes = f"remote {self.server_host} 443 tcp\nremote {self.server_host} {self.server_port}"
+
+        tls_crypt_block = ""
+        if self.tls_crypt_key:
+            tls_crypt_block = f"\n<tls-crypt>\n{self.tls_crypt_key}\n</tls-crypt>\n"
 
         return f"""# PasarGuard VPN Client Configuration - {node_name}
 client
@@ -354,8 +360,7 @@ verb 3
 
 <ca>
 {self.ca_cert}
-</ca>
-"""
+</ca>{tls_crypt_block}"""
 
 
 class AppleMobileConfigGenerator:

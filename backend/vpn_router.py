@@ -168,6 +168,24 @@ def get_ca_certificate() -> str:
     return "-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAL0...\n-----END CERTIFICATE-----"
 
 
+def get_tls_crypt_key() -> str:
+    candidates = [
+        Path("/var/lib/pasarguard/vpn/certs/tls-crypt.key"),
+        Path("/opt/pasarguard-vpn/certs/tls-crypt.key"),
+        Path("/etc/openvpn/certs/tls-crypt.key"),
+        Path.cwd() / "certs" / "tls-crypt.key",
+    ]
+    for p in candidates:
+        if p.is_file():
+            try:
+                content = p.read_text(encoding="utf-8").strip()
+                if content:
+                    return content
+            except Exception:
+                pass
+    return ""
+
+
 def resolve_node_host(node_name: str) -> str:
     name_clean = node_name.lower().strip()
     direct_map = {
@@ -209,11 +227,13 @@ def download_openvpn_config(
     """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn با سرتیفیکیت معتبر CA و آدرس واقعی نود"""
     server_host = resolve_node_host(node)
     ca_content = get_ca_certificate()
+    tls_crypt_content = get_tls_crypt_key()
     generator = OpenVPNClientConfigGenerator(
         server_host=server_host,
         server_port=1194,
         proto=proto,
         ca_cert=ca_content,
+        tls_crypt_key=tls_crypt_content,
         cipher="AES-256-GCM",
     )
     content = generator.generate(node_name=node)
