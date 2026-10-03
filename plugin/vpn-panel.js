@@ -333,16 +333,29 @@
       const btnMobile = document.getElementById('btn-dl-mobileconfig');
 
       function updateLinks() {
-        const u = encodeURIComponent(userInp.value || 'user');
-        const n = encodeURIComponent(nodeSel.value || 'DE-Hetzner1');
-        btnOvpn.href = `${API_BASE}/client/ovpn?node=${n}&username=${u}`;
-        btnMobile.href = `${API_BASE}/client/mobileconfig?node=${n}&username=${u}`;
+        const u = encodeURIComponent(userInp ? userInp.value || 'user' : 'user');
+        const n = encodeURIComponent(nodeSel ? nodeSel.value || 'DE-Hetzner1' : 'DE-Hetzner1');
+        const ovpnUrl = `${API_BASE}/client/ovpn?node=${n}&username=${u}`;
+        const mobUrl = `${API_BASE}/client/mobileconfig?node=${n}&username=${u}`;
+        if (btnOvpn) {
+          btnOvpn.href = ovpnUrl;
+          btnOvpn.setAttribute('href', ovpnUrl);
+        }
+        if (btnMobile) {
+          btnMobile.href = mobUrl;
+          btnMobile.setAttribute('href', mobUrl);
+        }
       }
 
-      userInp.oninput = updateLinks;
-      nodeSel.onchange = updateLinks;
+      if (userInp) userInp.oninput = updateLinks;
+      if (nodeSel) nodeSel.onchange = updateLinks;
       updateLinks();
     }
+  }
+
+  function setTab(tab) {
+    currentTab = tab;
+    renderModal();
   }
 
   // اضافه کردن تب به نوار منوی اصلی پاسارگارد
@@ -377,5 +390,5 @@
   }
 
   // Export for testing
-  window.__PasarGuardVPN = { renderModal, injectStyles, STYLES_ID, MODAL_ID };
+  window.__PasarGuardVPN = { renderModal, setTab, injectStyles, STYLES_ID, MODAL_ID };
 })();

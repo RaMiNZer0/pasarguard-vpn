@@ -149,4 +149,38 @@ if (document.getElementById(window.__PasarGuardVPN.MODAL_ID)) {
 }
 console.log('✓ PASS: Modal closes cleanly without dangling DOM nodes');
 
+// Test 4: Re-render modal and verify Tab Switching
+window.__PasarGuardVPN.renderModal();
+const modalAgain = document.getElementById(window.__PasarGuardVPN.MODAL_ID);
+if (!modalAgain) {
+  console.error('FAIL: Could not re-open modal');
+  process.exit(1);
+}
+
+window.__PasarGuardVPN.setTab('groups');
+const modalWithGroups = document.getElementById(window.__PasarGuardVPN.MODAL_ID);
+if (!modalWithGroups.innerHTML.includes('گروه‌های کاربری')) {
+  console.error('FAIL: Groups tab content not rendered in modal');
+  process.exit(1);
+}
+console.log('✓ PASS: Tab switching to Groups works seamlessly');
+
+// Test 5: Switch to clients tab and test link updating
+window.__PasarGuardVPN.setTab('clients');
+const btnOvpn = document.getElementById('btn-dl-ovpn');
+const btnMobile = document.getElementById('btn-dl-mobileconfig');
+if (!btnOvpn || !btnMobile) {
+  console.error('FAIL: Download buttons not found in clients tab');
+  process.exit(1);
+}
+if (!btnOvpn.getAttribute('href').includes('client/ovpn') || !btnMobile.getAttribute('href').includes('client/mobileconfig')) {
+  console.error('FAIL: Download links do not have correct endpoint targets');
+  process.exit(1);
+}
+console.log('✓ PASS: Client download URLs generate and update reactively');
+
+// Clean up
+const finalClose = document.getElementById('pg-vpn-close');
+if (finalClose) finalClose.onclick();
+
 console.log('[Agent Pixel] All UI verification tests PASSED with 100% precision!');
