@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 # Master panel configuration for multi-node deployments
 MASTER_URL = os.environ.get("PASARGUARD_MASTER_URL", "").rstrip("/")
 API_TOKEN = os.environ.get("PASARGUARD_NODE_API_KEY", "")
+NODE_NAME = os.environ.get("PASARGUARD_NODE_NAME", "")
 
 try:
     from node_worker.local_cache import LocalAuthCache
@@ -88,6 +89,7 @@ def handle_openvpn_auth_cli(auth_file: str, engine: Optional[Any] = None) -> int
                     "username": username,
                     "password": password,
                     "protocol": "openvpn",
+                    "node": NODE_NAME,
                 })
                 allowed = bool(res.get("allowed"))
                 if _local_cache:

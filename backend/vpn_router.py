@@ -55,6 +55,7 @@ class AuthRequest(BaseModel):
     username: str
     password: str
     protocol: str = Field(default="openvpn")
+    node: Optional[str] = None
 
 
 class UsageReportRequest(BaseModel):
@@ -62,6 +63,7 @@ class UsageReportRequest(BaseModel):
     bytes_in: int = Field(ge=0)
     bytes_out: int = Field(ge=0)
     protocol: str = Field(default="openvpn")
+    node: Optional[str] = None
 
 
 class GroupPolicyRequest(BaseModel):
@@ -79,14 +81,31 @@ def authenticate(
     engine: VPNEngine = Depends(get_vpn_engine),
     _sec: None = Depends(verify_node_api_key),
 ) -> Dict[str, Any]:
-    """احراز هویت بلادرنگ کلاینت‌ها (Real-Time Auth)"""
+    """احراز هویت بلادرنگ کلاینت‌ها (Real-Time Auth) با پشتیبانی از تفکیک نودها"""
     result = engine.authenticate_user(
         username=payload.username,
         password=payload.password,
         protocol=payload.protocol,
     )
+    if not result.allowed:
+        return {
+            "allowed": False,
+            "username": result.username,
+            "remaining_bytes": 0,
+            "reason": result.reason,
+        }
+
+    # اگر هوک مشخص کرده کدام نود است، دسترسی کاربر به این نود چک می‌شود
+    if payload.node and not engine.can_user_access_node(payload.username, payload.node):
+        return {
+            "allowed": False,
+            "username": payload.username,
+            "remaining_bytes": result.remaining_bytes,
+            "reason": f"Access denied to node {payload.node} for user group",
+        }
+
     return {
-        "allowed": result.allowed,
+        "allowed": True,
         "username": result.username,
         "remaining_bytes": result.remaining_bytes,
         "reason": result.reason,

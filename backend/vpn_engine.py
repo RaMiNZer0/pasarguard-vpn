@@ -297,6 +297,8 @@ class VPNEngine:
         user = self._users.get(username)
         if not user:
             return False
+        if user.group not in self._group_policies:
+            return True
         allowed = self._group_policies.get(user.group, [])
         return node_name in allowed
 
