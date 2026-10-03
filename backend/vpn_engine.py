@@ -315,13 +315,13 @@ class VPNEngine:
 
 
 class OpenVPNClientConfigGenerator:
-    """تولیدکننده استاندارد فایل‌های تک‌فایلی .ovpn"""
+    """تولیدکننده استاندارد فایل‌های تک‌فایلی .ovpn با قابلیت اتصال دوگانه TCP 443 و UDP 1194"""
 
     def __init__(
         self,
         server_host: str,
-        server_port: int = 1194,
-        proto: str = "udp",
+        server_port: int = 443,
+        proto: str = "tcp",
         ca_cert: str = "",
         cipher: str = "AES-256-GCM",
     ) -> None:
@@ -332,11 +332,16 @@ class OpenVPNClientConfigGenerator:
         self.cipher = cipher
 
     def generate(self, node_name: str = "PasarGuard-Node") -> str:
+        if self.proto == "udp":
+            remotes = f"remote {self.server_host} {self.server_port}\nremote {self.server_host} 443 tcp"
+        else:
+            remotes = f"remote {self.server_host} 443 tcp\nremote {self.server_host} {self.server_port}"
+
         return f"""# PasarGuard VPN Client Configuration - {node_name}
 client
 dev tun
 proto {self.proto}
-remote {self.server_host} {self.server_port}
+{remotes}
 resolv-retry infinite
 nobind
 persist-key
@@ -344,6 +349,7 @@ persist-tun
 remote-cert-tls server
 auth-user-pass
 cipher {self.cipher}
+mssfix 1360
 verb 3
 
 <ca>

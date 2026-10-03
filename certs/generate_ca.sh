@@ -21,16 +21,37 @@ else
   echo "[VPN-Cert] Root CA already exists."
 fi
 
-# 2. Server Key and CSR
-if [[ ! -f "server.key" || ! -f "server.crt" ]]; then
+# 2. Server Key and CSR with X509v3 Extensions (critical for OpenVPN remote-cert-tls and strongSwan SAN)
+if [[ ! -f "server.key" || ! -f "server.crt" || "${FORCE_REGEN_SERVER:-0}" == "1" ]]; then
   openssl genrsa -out server.key 2048
   openssl req -new -key server.key -out server.csr \
     -subj "/C=IR/ST=Tehran/O=PasarGuard/CN=server.vpn.pasarguard"
 
-  # Sign Server Certificate with CA
-  openssl x509 -req -days 1825 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt
-  rm -f server.csr
-  echo "[VPN-Cert] ✓ Server certificate created (server.crt, server.key)"
+  cat << 'EOF' > server_ext.cnf
+basicConstraints = CA:FALSE
+nsCertType = server
+nsComment = "PasarGuard VPN Server Certificate"
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer:always
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, 1.3.6.1.5.5.7.3.1
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = tur.mobx48.ir
+DNS.2 = fin.mobx48.ir
+DNS.3 = sub.mob48.ir
+DNS.4 = server.vpn.pasarguard
+IP.1 = 77.83.203.140
+IP.2 = 65.109.217.93
+IP.3 = 91.107.146.13
+EOF
+
+  # Sign Server Certificate with CA using X509v3 extensions
+  openssl x509 -req -days 1825 -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -out server.crt -extfile server_ext.cnf
+  rm -f server.csr server_ext.cnf
+  echo "[VPN-Cert] ✓ X509v3 Server certificate created (server.crt, server.key)"
 else
   echo "[VPN-Cert] Server certificate already exists."
 fi

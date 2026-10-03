@@ -203,6 +203,7 @@ def resolve_node_host(node_name: str) -> str:
 def download_openvpn_config(
     node: str = Query(..., description="Node name or identifier"),
     username: str = Query(..., description="Username for auth"),
+    proto: str = Query("tcp", description="Protocol: tcp (port 443) or udp (port 1194)"),
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Response:
     """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn با سرتیفیکیت معتبر CA و آدرس واقعی نود"""
@@ -211,7 +212,7 @@ def download_openvpn_config(
     generator = OpenVPNClientConfigGenerator(
         server_host=server_host,
         server_port=1194,
-        proto="udp",
+        proto=proto,
         ca_cert=ca_content,
         cipher="AES-256-GCM",
     )
