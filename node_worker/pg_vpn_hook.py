@@ -132,6 +132,7 @@ def handle_openvpn_disconnect_cli(
             "bytes_in": bytes_in,
             "bytes_out": bytes_out,
             "protocol": "openvpn",
+            "node": NODE_NAME,
         })
     else:
         from backend.vpn_engine import VPNEngine
@@ -162,6 +163,7 @@ def handle_l2tp_ip_down_cli(
             "bytes_in": bytes_in,
             "bytes_out": bytes_out,
             "protocol": "l2tp",
+            "node": NODE_NAME,
         })
 
     from backend.vpn_engine import VPNEngine

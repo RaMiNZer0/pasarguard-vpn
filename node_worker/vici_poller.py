@@ -30,6 +30,7 @@ class StrongSwanVICIPoller:
     ) -> None:
         self.master_url = (master_url or os.environ.get("PASARGUARD_MASTER_URL", "")).rstrip("/")
         self.api_token = api_token or os.environ.get("PASARGUARD_NODE_API_KEY", "")
+        self.node_name = os.environ.get("PASARGUARD_NODE_NAME", "")
         self.vici_socket = vici_socket
         # نگهداری آخرین بایت‌های خوانده‌شده برای هر SA: {sa_name: {"in": X, "out": Y}}
         self._last_seen_bytes: Dict[str, Dict[str, int]] = {}
@@ -92,6 +93,7 @@ class StrongSwanVICIPoller:
             "bytes_in": bytes_in,
             "bytes_out": bytes_out,
             "protocol": "ikev2",
+            "node": self.node_name,
         }).encode("utf-8")
 
         headers = {

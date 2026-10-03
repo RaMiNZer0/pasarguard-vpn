@@ -45,6 +45,13 @@ if [[ "${MODE}" == "--node" || "${MODE}" == "node" ]]; then
   apt-get update -y
   apt-get install -y openvpn strongswan strongswan-pki libcharon-extra-plugins xl2tpd ppp iptables
 
+  # 1. Enable IPv4 forwarding
+  sysctl -w net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
+  if [[ ! -f /etc/sysctl.d/99-vpn-forward.conf ]]; then
+    echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-vpn-forward.conf
+  fi
+
+  # 2. Fetch worker scripts
   mkdir -p /opt/pasarguard-vpn/node_worker /opt/pasarguard-vpn/systemd
   fetch_file "node_worker/pg_vpn_hook.py" "/opt/pasarguard-vpn/node_worker/pg_vpn_hook.py"
   fetch_file "node_worker/vici_poller.py" "/opt/pasarguard-vpn/node_worker/vici_poller.py"
@@ -53,6 +60,19 @@ if [[ "${MODE}" == "--node" || "${MODE}" == "node" ]]; then
   fetch_file "node_worker/__init__.py" "/opt/pasarguard-vpn/node_worker/__init__.py"
   fetch_file "systemd/pg-vpn-vici-poller.service" "/etc/systemd/system/pg-vpn-vici-poller.service" 2>/dev/null || true
   chmod +x /opt/pasarguard-vpn/node_worker/*.py
+
+  # 3. L2TP ppp ip-down accounting hook
+  mkdir -p /etc/ppp
+  if ! grep -q "pg_vpn_hook.py disconnect-l2tp" /etc/ppp/ip-down 2>/dev/null; then
+    echo "/usr/bin/python3 /opt/pasarguard-vpn/node_worker/pg_vpn_hook.py disconnect-l2tp >/dev/null 2>&1 || true" >> /etc/ppp/ip-down
+    chmod +x /etc/ppp/ip-down
+  fi
+
+  # 4. Enable strongSwan VICI Poller
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+    systemctl enable --now pg-vpn-vici-poller.service 2>/dev/null || true
+  fi
 
   echo -e "${GREEN}✓ Node worker hooks & VICI poller installed at /opt/pasarguard-vpn/node_worker/${NC}"
   exit 0
@@ -75,6 +95,8 @@ chmod +x "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
 fetch_file "certs/generate_ca.sh" "${INSTALL_DIR}/certs/generate_ca.sh"
 chmod +x "${INSTALL_DIR}/certs/generate_ca.sh"
 fetch_file "config.env.example" "${INSTALL_DIR}/config.env.example"
+fetch_file "uninstall.sh" "${INSTALL_DIR}/uninstall.sh"
+chmod +x "${INSTALL_DIR}/uninstall.sh"
 fetch_file "version.json" "${INSTALL_DIR}/version.json"
 
 # Copy python modules
