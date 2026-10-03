@@ -14,4 +14,11 @@
 - `backend/vpn_router.py`: روتر REST API (`/api/vpn/*`)
 - `node_worker/pg_vpn_hook.py`: هوک سرورهای نود
 - `plugin/vpn-panel.js`: رابط کاربری داشبورد
-- `tests/`: تست‌های جامع با pytest و Node.js
+- `install.sh`: اسکریپت نصب خودکار حالت Master و Worker Node
+- `tests/`: تست‌های جامع با pytest و Node.js (۳۱ تست کامل پاس شده)
+
+## تست و تایید صحت:
+```bash
+python -m pytest
+node tests/test_vpn_ui.js
+```
