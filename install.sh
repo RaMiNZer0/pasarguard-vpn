@@ -102,24 +102,60 @@ fetch_file "version.json" "${INSTALL_DIR}/version.json"
 # Copy python modules
 cp -rf "${INSTALL_DIR}/backend" "${PYTHON_DIR}/"
 
-echo -e "${YELLOW}[3/4] Enabling router in sitecustomize.py...${NC}"
+echo -e "${YELLOW}[3/4] Enabling router in sitecustomize.py and .env...${NC}"
 SITECUSTOMIZE="${PYTHON_DIR}/sitecustomize.py"
 cat << 'EOF' > "${SITECUSTOMIZE}"
 import os
 import sys
+from pathlib import Path
 
-# Add custom vpn modules to path
+# 1. Chain CleanIP or any other sitecustomize if present
+cleanip_sc = "/var/lib/pasarguard/cleanip/python/sitecustomize.py"
+if os.path.exists(cleanip_sc) and os.path.abspath(cleanip_sc) != os.path.abspath(__file__):
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("cleanip_sitecustomize", cleanip_sc)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+    except Exception:
+        pass
+
+# 2. Add custom vpn modules to path
 vpn_dir = "/var/lib/pasarguard/vpn/python"
 if vpn_dir not in sys.path:
     sys.path.insert(0, vpn_dir)
 
+# 3. Register VPN router into PasarGuard
 try:
-    from app.routers import api_router
+    candidates = [Path.cwd(), Path("/code"), Path("/app"), Path("/opt/pasarguard")]
+    for cand in candidates:
+        if (cand / "main.py").is_file() and (cand / "app").is_dir():
+            cand_str = str(cand.resolve())
+            if cand_str not in sys.path:
+                sys.path.insert(0, cand_str)
+            break
+
     from backend.vpn_router import router as vpn_router
-    api_router.include_router(vpn_router)
-except Exception:
-    pass
+    from app.routers import api_router
+
+    if not any(getattr(r, "prefix", None) == "/api/vpn" for r in api_router.routes):
+        api_router.include_router(vpn_router)
+        sys.stderr.write("[VPN-Hub] Router successfully registered in PasarGuard API\n")
+except Exception as e:
+    sys.stderr.write(f"[VPN-Hub] Bootstrap notice: {e}\n")
 EOF
+
+# Ensure PYTHONPATH is configured in /opt/pasarguard/.env
+if [[ -f "/opt/pasarguard/.env" ]]; then
+  if grep -q "^PYTHONPATH=" /opt/pasarguard/.env; then
+    if ! grep -q "/var/lib/pasarguard/vpn/python" /opt/pasarguard/.env; then
+      sed -i 's|^PYTHONPATH="\(.*\)"|PYTHONPATH="/var/lib/pasarguard/vpn/python:\1"|' /opt/pasarguard/.env
+    fi
+  else
+    echo 'PYTHONPATH="/var/lib/pasarguard/vpn/python"' >> /opt/pasarguard/.env
+  fi
+fi
 
 echo -e "${YELLOW}[4/4] Injecting Web UI to PasarGuard Dashboard (Host & Docker)...${NC}"
 bash "${INSTALL_DIR}/plugin/integrate-dashboard.sh" || {

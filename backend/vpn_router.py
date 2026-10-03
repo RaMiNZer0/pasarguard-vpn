@@ -35,8 +35,7 @@ def verify_node_api_key(
     if token != expected_key:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid Node API Key")
 
-# Default data directory
-DATA_DIR = Path(os.environ.get("PASARGUARD_VPN_DATA_DIR", "/opt/pasarguard-cleanip/data/vpn"))
+DATA_DIR = Path(os.environ.get("PASARGUARD_VPN_DATA_DIR", "/var/lib/pasarguard/vpn/data"))
 _engine_instance: Optional[VPNEngine] = None
 
 
@@ -44,6 +43,16 @@ def get_vpn_engine() -> VPNEngine:
     global _engine_instance
     if _engine_instance is None:
         _engine_instance = VPNEngine(data_dir=DATA_DIR)
+        try:
+            from backend.pg_db_reader import PasarGuardDBReader
+            from backend.pg_user_sync import PasarGuardUserSync
+            reader = PasarGuardDBReader()
+            if reader.is_available():
+                syncer = PasarGuardUserSync(reader, _engine_instance)
+                _engine_instance.set_user_syncer(syncer)
+                syncer.sync_all()
+        except Exception:
+            pass
     return _engine_instance
 
 

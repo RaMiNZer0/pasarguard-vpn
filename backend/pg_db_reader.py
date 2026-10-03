@@ -19,6 +19,15 @@ from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger("pasarguard_vpn.db_reader")
 
+try:
+    from app.db.base import GetDB
+    from app.db.models import User
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    _HAS_APP_DB = True
+except ImportError:
+    _HAS_APP_DB = False
+
 
 class PasarGuardDBReader:
     """خواندن امن و بلادرنگ اطلاعات کاربران از دیتابیس پاسارگارد به صورت Read-Only"""
@@ -47,6 +56,8 @@ class PasarGuardDBReader:
 
     def is_available(self) -> bool:
         """بررسی موجودیت و دسترسی به دیتابیس"""
+        if _HAS_APP_DB:
+            return True
         p = self._get_sqlite_path()
         return p is not None and p.exists()
 
@@ -122,10 +133,58 @@ class PasarGuardDBReader:
                 return 0
         return 0
 
+    def _fetch_from_app_db(self, username: Optional[str] = None) -> List[Dict[str, Any]]:
+        import asyncio
+        from app.db.base import GetDB
+        from app.db.models import User
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+
+        async def _query():
+            async with GetDB() as db:
+                stmt = select(User).options(selectinload(User.groups))
+                if username:
+                    stmt = stmt.where(User.username == username)
+                res = await db.execute(stmt)
+                users = res.scalars().all()
+                out = []
+                for u in users:
+                    pws = self._extract_passwords_from_proxy_settings(u.proxy_settings)
+                    groups = [g.name for g in u.groups] if getattr(u, "groups", None) else ["default"]
+                    expire_ts = int(u.expire.timestamp()) if getattr(u, "expire", None) and hasattr(u.expire, "timestamp") else 0
+                    status_str = u.status.value if hasattr(u.status, "value") else str(u.status).lower()
+                    out.append({
+                        "id": u.id,
+                        "username": u.username,
+                        "status": status_str,
+                        "used_traffic": int(u.used_traffic or 0),
+                        "data_limit": int(u.data_limit or 0),
+                        "expire": expire_ts,
+                        "valid_passwords": list(pws),
+                        "groups": groups,
+                    })
+                return out
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    return pool.submit(asyncio.run, _query()).result()
+            return loop.run_until_complete(_query())
+        except RuntimeError:
+            return asyncio.run(_query())
+        except Exception as e:
+            logger.error(f"Error reading from app.db: {e}")
+            return []
+
     def fetch_all_users(self) -> List[Dict[str, Any]]:
         """واکشی تمام رکوردهای کاربران همراه با گروه‌ها و سهمیه‌ها"""
         if not self.is_available():
             return []
+
+        if _HAS_APP_DB:
+            return self._fetch_from_app_db()
 
         conn = self._get_connection()
         try:
@@ -172,6 +231,10 @@ class PasarGuardDBReader:
         """واکشی آنی یک کاربر خاص برای احراز هویت بلادرنگ در لحظه اتصال"""
         if not self.is_available():
             return None
+
+        if _HAS_APP_DB:
+            res = self._fetch_from_app_db(username=username)
+            return res[0] if res else None
 
         conn = self._get_connection()
         try:

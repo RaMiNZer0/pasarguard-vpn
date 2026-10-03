@@ -70,6 +70,12 @@ echo -e "${YELLOW}[3/4] Removing Python router extension...${NC}"
 rm -rf /var/lib/pasarguard/vpn/python 2>/dev/null || true
 rm -f /opt/pasarguard/dashboard/build/statics/vpn-panel.js 2>/dev/null || true
 
+# Revert PYTHONPATH in .env
+if [[ -f "/opt/pasarguard/.env" ]]; then
+  sed -i 's|/var/lib/pasarguard/vpn/python:||g' /opt/pasarguard/.env
+  sed -i 's|:/var/lib/pasarguard/vpn/python||g' /opt/pasarguard/.env
+fi
+
 # 4. Remove installation directory
 echo -e "${YELLOW}[4/4] Cleaning up directory /opt/pasarguard-vpn...${NC}"
 rm -rf /opt/pasarguard-vpn
