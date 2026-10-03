@@ -335,9 +335,9 @@ class OpenVPNClientConfigGenerator:
 
     def generate(self, node_name: str = "PasarGuard-Node") -> str:
         if self.proto == "udp":
-            remotes = f"remote {self.server_host} {self.server_port}\nremote {self.server_host} 443 tcp"
+            remotes = f"remote {self.server_host} {self.server_port}"
         else:
-            remotes = f"remote {self.server_host} 443 tcp\nremote {self.server_host} {self.server_port}"
+            remotes = f"remote {self.server_host} 443"
 
         tls_crypt_block = ""
         if self.tls_crypt_key:
@@ -355,7 +355,7 @@ persist-tun
 remote-cert-tls server
 auth-user-pass
 cipher {self.cipher}
-mssfix 1360
+mssfix 1200
 verb 3
 
 <ca>

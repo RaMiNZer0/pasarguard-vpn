@@ -221,7 +221,7 @@ def resolve_node_host(node_name: str) -> str:
 def download_openvpn_config(
     node: str = Query(..., description="Node name or identifier"),
     username: str = Query(..., description="Username for auth"),
-    proto: str = Query("tcp", description="Protocol: tcp (port 443) or udp (port 1194)"),
+    proto: str = Query("udp", description="Protocol: udp (port 1194) or tcp (port 443)"),
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Response:
     """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn با سرتیفیکیت معتبر CA و آدرس واقعی نود"""
@@ -230,7 +230,7 @@ def download_openvpn_config(
     tls_crypt_content = get_tls_crypt_key()
     generator = OpenVPNClientConfigGenerator(
         server_host=server_host,
-        server_port=1194,
+        server_port=1194 if proto == "udp" else 443,
         proto=proto,
         ca_cert=ca_content,
         tls_crypt_key=tls_crypt_content,
@@ -241,7 +241,7 @@ def download_openvpn_config(
     return Response(
         content=content,
         media_type="application/x-openvpn-profile",
-        headers={"Content-Disposition": f'attachment; filename="{node}.ovpn"'},
+        headers={"Content-Disposition": f'attachment; filename="{node}_{proto}.ovpn"'},
     )
 
 

@@ -243,9 +243,13 @@
               <span>🍏</span>
               <span>نصب مستقیم در آیفون / مک (IKEv2)</span>
             </a>
-            <a href="${cfg.ovpn_download_url}" class="pg-vpn-dl-btn pg-vpn-btn-ovpn">
-              <span>📥</span>
-              <span>دانلود کانفیگ OpenVPN (.ovpn)</span>
+            <a href="${cfg.ovpn_download_url}&proto=udp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn">
+              <span>⚡</span>
+              <span>دانلود OpenVPN (پروتکل UDP - پیش‌فرض)</span>
+            </a>
+            <a href="${cfg.ovpn_download_url}&proto=tcp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn" style="background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+              <span>🛡️</span>
+              <span>دانلود OpenVPN (پروتکل TCP - پورت 443)</span>
             </a>
           </div>
 
