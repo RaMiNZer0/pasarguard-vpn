@@ -355,7 +355,10 @@ persist-tun
 remote-cert-tls server
 auth-user-pass
 cipher {self.cipher}
-mssfix 1200
+tun-mtu 1200
+mssfix 1150
+hand-window 120
+tls-timeout 5
 verb 3
 
 <ca>
