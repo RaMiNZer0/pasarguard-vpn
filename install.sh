@@ -90,6 +90,7 @@ fetch_file "backend/pg_db_reader.py" "${INSTALL_DIR}/backend/pg_db_reader.py"
 fetch_file "backend/pg_user_sync.py" "${INSTALL_DIR}/backend/pg_user_sync.py"
 fetch_file "backend/__init__.py" "${INSTALL_DIR}/backend/__init__.py"
 fetch_file "plugin/vpn-panel.js" "${INSTALL_DIR}/plugin/vpn-panel.js"
+fetch_file "plugin/vpn-sub.js" "${INSTALL_DIR}/plugin/vpn-sub.js"
 fetch_file "plugin/integrate-dashboard.sh" "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
 chmod +x "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
 fetch_file "certs/generate_ca.sh" "${INSTALL_DIR}/certs/generate_ca.sh"
@@ -109,41 +110,45 @@ import os
 import sys
 from pathlib import Path
 
-# 1. Chain CleanIP or any other sitecustomize if present
-cleanip_sc = "/var/lib/pasarguard/cleanip/python/sitecustomize.py"
-if os.path.exists(cleanip_sc) and os.path.abspath(cleanip_sc) != os.path.abspath(__file__):
+# Prevent repeated bootstrap
+if not getattr(sys, "_pasarguard_vpn_initialized", False):
+    sys._pasarguard_vpn_initialized = True
+
+    # 1. Chain CleanIP or any other sitecustomize if present
+    cleanip_sc = "/var/lib/pasarguard/cleanip/python/sitecustomize.py"
+    if os.path.exists(cleanip_sc) and os.path.abspath(cleanip_sc) != os.path.abspath(__file__):
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("cleanip_sitecustomize", cleanip_sc)
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+        except Exception:
+            pass
+
+    # 2. Add custom vpn modules to path
+    vpn_dir = "/var/lib/pasarguard/vpn/python"
+    if vpn_dir not in sys.path:
+        sys.path.insert(0, vpn_dir)
+
+    # 3. Register VPN router into PasarGuard
     try:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("cleanip_sitecustomize", cleanip_sc)
-        if spec and spec.loader:
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-    except Exception:
-        pass
+        candidates = [Path.cwd(), Path("/code"), Path("/app"), Path("/opt/pasarguard")]
+        for cand in candidates:
+            if (cand / "main.py").is_file() and (cand / "app").is_dir():
+                cand_str = str(cand.resolve())
+                if cand_str not in sys.path:
+                    sys.path.insert(0, cand_str)
+                break
 
-# 2. Add custom vpn modules to path
-vpn_dir = "/var/lib/pasarguard/vpn/python"
-if vpn_dir not in sys.path:
-    sys.path.insert(0, vpn_dir)
+        from backend.vpn_router import router as vpn_router
+        from app.routers import api_router
 
-# 3. Register VPN router into PasarGuard
-try:
-    candidates = [Path.cwd(), Path("/code"), Path("/app"), Path("/opt/pasarguard")]
-    for cand in candidates:
-        if (cand / "main.py").is_file() and (cand / "app").is_dir():
-            cand_str = str(cand.resolve())
-            if cand_str not in sys.path:
-                sys.path.insert(0, cand_str)
-            break
-
-    from backend.vpn_router import router as vpn_router
-    from app.routers import api_router
-
-    if not any(getattr(r, "prefix", None) == "/api/vpn" for r in api_router.routes):
-        api_router.include_router(vpn_router)
-        sys.stderr.write("[VPN-Hub] Router successfully registered in PasarGuard API\n")
-except Exception as e:
-    sys.stderr.write(f"[VPN-Hub] Bootstrap notice: {e}\n")
+        if not any(getattr(r, "prefix", None) == "/api/vpn" for r in api_router.routes):
+            api_router.include_router(vpn_router)
+            sys.stderr.write("[VPN-Hub] Router successfully registered in PasarGuard API\n")
+    except Exception as e:
+        sys.stderr.write(f"[VPN-Hub] Bootstrap notice: {e}\n")
 EOF
 
 # Ensure PYTHONPATH is configured in /opt/pasarguard/.env
@@ -157,10 +162,29 @@ if [[ -f "/opt/pasarguard/.env" ]]; then
   fi
 fi
 
-echo -e "${YELLOW}[4/4] Injecting Web UI to PasarGuard Dashboard (Host & Docker)...${NC}"
+echo -e "${YELLOW}[4/4] Injecting Web UI to PasarGuard Dashboard and Client Subscription...${NC}"
 bash "${INSTALL_DIR}/plugin/integrate-dashboard.sh" || {
   echo -e "${YELLOW}Warning: Automatic dashboard integration skipped, will fallback to manual injection if needed.${NC}"
 }
+
+# Inject vpn-sub.js into subscription template
+SUB_TEMPLATE="/var/lib/pasarguard/templates/subscription/index.html"
+if [[ -f "${SUB_TEMPLATE}" && -f "${INSTALL_DIR}/plugin/vpn-sub.js" ]]; then
+  if ! grep -q "pg-vpn-sub-initialized" "${SUB_TEMPLATE}"; then
+    echo -e "${GREEN}Injecting 1-Click VPN download buttons to user subscription page...${NC}"
+    python3 -c "
+with open('${SUB_TEMPLATE}', 'r', encoding='utf-8') as f:
+    c = f.read()
+with open('${INSTALL_DIR}/plugin/vpn-sub.js', 'r', encoding='utf-8') as f:
+    js_code = f.read()
+script_tag = f'\n<script id=\"pg-vpn-sub-initialized\">\n{js_code}\n</script>\n'
+if '</body>' in c and 'pg-vpn-sub-initialized' not in c:
+    c = c.replace('</body>', script_tag + '</body>')
+    with open('${SUB_TEMPLATE}', 'w', encoding='utf-8') as f:
+        f.write(c)
+" || true
+  fi
+fi
 
 echo -e "\n${GREEN}======================================================${NC}"
 echo -e "${GREEN}  ✓ PasarGuard Unified VPN installed successfully!   ${NC}"

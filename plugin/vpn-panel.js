@@ -176,9 +176,30 @@
   }
 
   let currentTab = 'nodes';
+  let cachedNodes = [
+    { name: 'turk', display_name: '🇹🇷 ترکیه (turk)', public_host: 'tur.mobx48.ir', status: 'connected', openvpn_port: 1194, ikev2_port: 500 },
+    { name: 'finland', display_name: '🇫🇮 فنلاند (finland)', public_host: 'fin.mobx48.ir', status: 'connected', openvpn_port: 1194, ikev2_port: 500 },
+  ];
+
+  function fetchLiveNodes() {
+    fetch(`${API_BASE}/nodes`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.nodes && data.nodes.length > 0) {
+          cachedNodes = data.nodes.filter((n) => n.address !== '127.0.0.1');
+          const bodyEl = document.getElementById('pg-vpn-body-content');
+          if (bodyEl && (currentTab === 'nodes' || currentTab === 'clients')) {
+            bodyEl.innerHTML = renderTabContent(currentTab);
+            bindTabEvents(currentTab);
+          }
+        }
+      })
+      .catch(() => {});
+  }
 
   function renderModal() {
     injectStyles();
+    fetchLiveNodes();
     let modal = document.getElementById(MODAL_ID);
     if (!modal) {
       modal = document.createElement('div');
@@ -192,7 +213,7 @@
         <div class="pg-vpn-header">
           <div class="pg-vpn-title">
             <span>🛡️ PasarGuard Unified VPN Manager</span>
-            <span class="pg-vpn-badge">OpenVPN & IKEv2 & L2TP</span>
+            <span class="pg-vpn-badge">OpenVPN & IKEv2</span>
           </div>
           <button class="pg-vpn-close-btn" id="pg-vpn-close">&times;</button>
         </div>
@@ -200,7 +221,7 @@
         <div class="pg-vpn-tabs">
           <button class="pg-vpn-tab-btn ${currentTab === 'nodes' ? 'active' : ''}" data-tab="nodes">🌐 نودهای سرور</button>
           <button class="pg-vpn-tab-btn ${currentTab === 'groups' ? 'active' : ''}" data-tab="groups">👥 نگاشت گروه‌ها</button>
-          <button class="pg-vpn-tab-btn ${currentTab === 'clients' ? 'active' : ''}" data-tab="clients">📥 دانلود کانفیگ کاربر</button>
+          <button class="pg-vpn-tab-btn ${currentTab === 'clients' ? 'active' : ''}" data-tab="clients">📥 تست دانلود کانفیگ</button>
           <button class="pg-vpn-tab-btn ${currentTab === 'status' ? 'active' : ''}" data-tab="status">📊 آمار و نشست‌های زنده</button>
         </div>
 
@@ -226,26 +247,21 @@
 
   function renderTabContent(tab) {
     if (tab === 'nodes') {
+      const nodesHtml = cachedNodes.map((n) => `
+        <div class="pg-vpn-card-node">
+          <div style="font-weight:700; color:#10b981;">🟢 ${n.display_name || n.name}</div>
+          <div style="font-size:12px; color:#d4d4d8;">آدرس: <code>${n.public_host || n.address}</code></div>
+          <div style="font-size:11px; color:#71717a;">OpenVPN: فعال (UDP ${n.openvpn_port || 1194})<br>IKEv2: فعال (Port ${n.ikev2_port || 500}/4500)</div>
+          <div style="font-size:11px; color:#10b981; margin-top:4px;">● وضعیت: متصل و آماده احراز هویت</div>
+        </div>
+      `).join('');
+
       return `
         <div style="font-size:13px; color:#a1a1aa; margin-bottom:12px;">
-          سرویس‌های VPN فعال روی نودهای پاسارگارد (OpenVPN Port 1194, IKEv2 Port 500/4500):
+          سرویس‌های VPN فعال روی نودهای پاسارگارد:
         </div>
         <div class="pg-vpn-grid">
-          <div class="pg-vpn-card-node">
-            <div style="font-weight:700; color:#10b981;">🟢 DE-Hetzner1 (آلمان)</div>
-            <div style="font-size:11px; color:#71717a;">OpenVPN: فعال (UDP 1194)<br>IKEv2: فعال (Port 500/4500)<br>L2TP: فعال (Port 1701)</div>
-            <button class="pg-vpn-btn pg-vpn-btn-sec" style="margin-top:6px;">تنظیم پروتکل‌ها</button>
-          </div>
-          <div class="pg-vpn-card-node">
-            <div style="font-weight:700; color:#10b981;">🟢 TR-Teknosos1 (ترکیه)</div>
-            <div style="font-size:11px; color:#71717a;">OpenVPN: فعال (UDP 1194)<br>IKEv2: فعال (Port 500/4500)<br>L2TP: فعال (Port 1701)</div>
-            <button class="pg-vpn-btn pg-vpn-btn-sec" style="margin-top:6px;">تنظیم پروتکل‌ها</button>
-          </div>
-          <div class="pg-vpn-card-node">
-            <div style="font-weight:700; color:#10b981;">🟢 US-AWS1 (آمریکا)</div>
-            <div style="font-size:11px; color:#71717a;">OpenVPN: فعال (UDP 1194)<br>IKEv2: فعال (Port 500/4500)<br>L2TP: فعال (Port 1701)</div>
-            <button class="pg-vpn-btn pg-vpn-btn-sec" style="margin-top:6px;">تنظیم پروتکل‌ها</button>
-          </div>
+          ${nodesHtml}
         </div>
       `;
     }
@@ -256,39 +272,36 @@
           تعیین دسترسی گروه‌های کاربری پاسارگارد به سرورهای VPN:
         </div>
         <div style="background:#202024; border:1px solid #27272a; border-radius:10px; padding:16px;">
-          <div style="font-weight:700; margin-bottom:10px;">👑 گروه VIP</div>
+          <div style="font-weight:700; margin-bottom:10px;">👑 گروه BETA (پیش‌فرض تمام کاربران)</div>
           <div style="display:flex; gap:16px; margin-bottom:12px; font-size:13px;">
-            <label><input type="checkbox" checked> DE-Hetzner1 (آلمان)</label>
-            <label><input type="checkbox" checked> TR-Teknosos1 (ترکیه)</label>
-            <label><input type="checkbox" checked> US-AWS1 (آمریکا)</label>
+            <label><input type="checkbox" checked disabled> 🇹🇷 ترکیه (turk)</label>
+            <label><input type="checkbox" checked disabled> 🇫🇮 فنلاند (finland)</label>
           </div>
-          <hr style="border:none; border-top:1px solid #27272a; margin:12px 0;">
-          <div style="font-weight:700; margin-bottom:10px;">👥 گروه Standard</div>
-          <div style="display:flex; gap:16px; font-size:13px;">
-            <label><input type="checkbox" checked> DE-Hetzner1 (آلمان)</label>
-            <label><input type="checkbox"> TR-Teknosos1 (ترکیه)</label>
-            <label><input type="checkbox"> US-AWS1 (آمریکا)</label>
+          <div style="font-size:11px; color:#10b981;">
+            ✨ حالت خودکار فعال است: تمامی کاربران به صورت پیش‌فرض به تمام نودهای متصل دسترسی دارند. نیازی به افزودن دستی کاربر نیست!
           </div>
         </div>
       `;
     }
 
     if (tab === 'clients') {
+      const optionsHtml = cachedNodes.map((n) => `
+        <option value="${n.name}">${n.display_name || n.name} (${n.public_host || n.address})</option>
+      `).join('');
+
       return `
         <div style="font-size:13px; color:#a1a1aa; margin-bottom:12px;">
-          تولید و تست دانلود مستقیم فایل‌های کانفیگ برای یک کاربر پاسارگارد:
+          تولید و تست مستقیم فایل‌های کانفیگ (در حالت عادی کاربران مستقیماً از صفحه اشتراک خود دریافت می‌کنند):
         </div>
-        <div style="display:flex; flex-direction:column; gap:12px; max-width:400px;">
+        <div style="display:flex; flex-direction:column; gap:12px; max-width:440px;">
           <div>
-            <label style="font-size:12px; color:#a1a1aa; display:block; margin-bottom:4px;">نام کاربری:</label>
-            <input type="text" id="pg-vpn-client-user" class="pg-vpn-input" value="ali" placeholder="نام کاربری...">
+            <label style="font-size:12px; color:#a1a1aa; display:block; margin-bottom:4px;">نام کاربری کاربر در پاسارگارد:</label>
+            <input type="text" id="pg-vpn-client-user" class="pg-vpn-input" value="test-ramin" placeholder="نام کاربری...">
           </div>
           <div>
             <label style="font-size:12px; color:#a1a1aa; display:block; margin-bottom:4px;">نود مقصد:</label>
             <select id="pg-vpn-client-node" class="pg-vpn-input">
-              <option value="DE-Hetzner1">DE-Hetzner1 (آلمان)</option>
-              <option value="TR-Teknosos1">TR-Teknosos1 (ترکیه)</option>
-              <option value="US-AWS1">US-AWS1 (آمریکا)</option>
+              ${optionsHtml}
             </select>
           </div>
           <div style="display:flex; gap:8px; margin-top:8px;">

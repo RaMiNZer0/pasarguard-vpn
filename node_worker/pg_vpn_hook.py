@@ -19,6 +19,23 @@ import urllib.error
 from typing import Any, Dict, Optional
 
 # Master panel configuration for multi-node deployments
+def _load_env_file():
+    for env_path in ["/opt/pasarguard-vpn/config.env", "/etc/pasarguard-vpn/node.env"]:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+
+_load_env_file()
 MASTER_URL = os.environ.get("PASARGUARD_MASTER_URL", "").rstrip("/")
 API_TOKEN = os.environ.get("PASARGUARD_NODE_API_KEY", "")
 NODE_NAME = os.environ.get("PASARGUARD_NODE_NAME", "")
@@ -53,7 +70,11 @@ def _call_master_api(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception as e:
         return {"allowed": False, "success": False, "reason": str(e)}
@@ -185,7 +206,9 @@ def main() -> None:
         handle_l2tp_ip_down_cli()
         sys.exit(0)
     else:
-        sys.exit(1)
+        # OpenVPN via-file calls the script with the auth file as $1
+        code = handle_openvpn_auth_cli(cmd)
+        sys.exit(code)
 
 
 if __name__ == "__main__":

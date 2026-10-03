@@ -297,10 +297,21 @@ class VPNEngine:
         user = self._users.get(username)
         if not user:
             return False
-        if user.group not in self._group_policies:
+        if user.group not in self._group_policies or not self._group_policies[user.group]:
             return True
         allowed = self._group_policies.get(user.group, [])
         return node_name in allowed
+
+    def get_allowed_nodes_for_user(
+        self, username: str, all_available_nodes: Optional[List[str]] = None
+    ) -> List[str]:
+        """واکشی لیست نودهای مجاز کاربر بر اساس گروه یا فال‌بک به همه نودها"""
+        user = self._users.get(username)
+        if not user:
+            return []
+        if user.group in self._group_policies and self._group_policies[user.group]:
+            return self._group_policies[user.group]
+        return all_available_nodes or ["turk", "finland"]
 
 
 class OpenVPNClientConfigGenerator:
@@ -349,14 +360,59 @@ class AppleMobileConfigGenerator:
         organization: str = "PasarGuard VPN",
         server_address: str = "",
         remote_id: str = "",
+        ca_cert: str = "",
     ) -> None:
         self.organization = organization
         self.server_address = server_address
         self.remote_id = remote_id or server_address
+        self.ca_cert = ca_cert.strip()
 
-    def generate(self, profile_name: str = "PasarGuard IKEv2", username: str = "") -> str:
+    def generate(
+        self,
+        profile_name: str = "PasarGuard IKEv2",
+        username: str = "",
+        password: str = "",
+    ) -> str:
         payload_uuid = str(uuid.uuid4())
         vpn_uuid = str(uuid.uuid4())
+        ca_uuid = str(uuid.uuid4())
+
+        # آماده‌سازی دیتا و پی‌لود سرتیفیکیت روت CA اپل در صورت وجود
+        ca_payload_xml = ""
+        if self.ca_cert:
+            clean_b64 = (
+                self.ca_cert.replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+                .replace("\n", "")
+                .replace("\r", "")
+                .strip()
+            )
+            if clean_b64:
+                ca_payload_xml = f"""
+        <dict>
+            <key>PayloadCertificateFileName</key>
+            <string>PasarGuard-CA.crt</string>
+            <key>PayloadContent</key>
+            <data>
+{clean_b64}
+            </data>
+            <key>PayloadDescription</key>
+            <string>PasarGuard VPN Root CA Certificate</string>
+            <key>PayloadDisplayName</key>
+            <string>PasarGuard Root CA</string>
+            <key>PayloadIdentifier</key>
+            <string>org.pasarguard.vpn.ca.{ca_uuid}</string>
+            <key>PayloadType</key>
+            <string>com.apple.security.root</string>
+            <key>PayloadUUID</key>
+            <string>{ca_uuid}</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+        </dict>"""
+
+        password_xml = f"""
+                <key>AuthPassword</key>
+                <string>{password}</string>""" if password else ""
 
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -377,7 +433,7 @@ class AppleMobileConfigGenerator:
     <key>PayloadVersion</key>
     <integer>1</integer>
     <key>PayloadContent</key>
-    <array>
+    <array>{ca_payload_xml}
         <dict>
             <key>PayloadDisplayName</key>
             <string>{profile_name}</string>
@@ -404,7 +460,7 @@ class AppleMobileConfigGenerator:
                 <key>ExtendedAuthEnabled</key>
                 <true/>
                 <key>AuthName</key>
-                <string>{username}</string>
+                <string>{username}</string>{password_xml}
                 <key>DeadPeerDetectionRate</key>
                 <string>Medium</string>
                 <key>DisableMOBIKE</key>

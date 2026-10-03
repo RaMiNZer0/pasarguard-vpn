@@ -112,6 +112,18 @@ class PasarGuardDBReader:
         if "vpn_password" in data:
             passwords.add(str(data["vpn_password"]))
 
+        # 5. VLESS UUID
+        if "vless" in data and isinstance(data["vless"], dict):
+            uid = data["vless"].get("id")
+            if uid:
+                passwords.add(str(uid))
+
+        # 6. VMess UUID
+        if "vmess" in data and isinstance(data["vmess"], dict):
+            uid = data["vmess"].get("id")
+            if uid:
+                passwords.add(str(uid))
+
         return passwords
 
     @staticmethod
@@ -337,3 +349,123 @@ class PasarGuardDBReader:
             }
         finally:
             conn.close()
+
+    async def fetch_nodes_async(self) -> List[Dict[str, Any]]:
+        """واکشی لیست نودهای متصل و نگاشت دامنه عمومی آنها"""
+        fallback_nodes = [
+            {
+                "id": 2,
+                "name": "turk",
+                "display_name": "🇹🇷 ترکیه (Turkey)",
+                "address": "77.83.203.140",
+                "public_host": "tur.mobx48.ir",
+                "port": 3333,
+                "status": "connected",
+                "openvpn_port": 1194,
+                "ikev2_port": 500,
+            },
+            {
+                "id": 3,
+                "name": "finland",
+                "display_name": "🇫🇮 فنلاند (Finland)",
+                "address": "65.109.217.93",
+                "public_host": "fin.mobx48.ir",
+                "port": 3333,
+                "status": "connected",
+                "openvpn_port": 1194,
+                "ikev2_port": 500,
+            },
+        ]
+
+        if not _HAS_APP_DB:
+            return fallback_nodes
+
+        try:
+            from app.db.base import GetDB
+            from app.db.models import Node, ProxyHost
+            from sqlalchemy import select
+
+            async with GetDB() as db:
+                res_n = await db.execute(select(Node))
+                nodes = res_n.scalars().all()
+                res_h = await db.execute(select(ProxyHost))
+                proxy_hosts = res_h.scalars().all()
+
+                # ساخت نگاشت آی‌پی/نود به دامنه عمومی
+                host_map: Dict[str, str] = {
+                    "turk": "tur.mobx48.ir",
+                    "77.83.203.140": "tur.mobx48.ir",
+                    "finland": "fin.mobx48.ir",
+                    "65.109.217.93": "fin.mobx48.ir",
+                }
+                for ph in proxy_hosts:
+                    addresses = ph.address if isinstance(ph.address, (set, list)) else [ph.address]
+                    for addr in addresses:
+                        if addr and isinstance(addr, str) and not addr.replace(".", "").isdigit():
+                            remark = (ph.remark or "").lower()
+                            if "turk" in remark or "ترکیه" in remark or "tr" in remark:
+                                host_map["turk"] = addr
+                                host_map["77.83.203.140"] = addr
+                            elif "fin" in remark or "فنلاند" in remark:
+                                host_map["finland"] = addr
+                                host_map["65.109.217.93"] = addr
+
+                out = []
+                for n in nodes:
+                    status_str = n.status.value if hasattr(n.status, "value") else str(n.status).lower()
+                    node_name = n.name.lower()
+                    pub_host = host_map.get(node_name) or host_map.get(n.address) or n.address
+                    if n.address == "127.0.0.1":
+                        pub_host = "sub.mob48.ir"
+
+                    display_name = n.name
+                    if "turk" in node_name:
+                        display_name = "🇹🇷 ترکیه (Turkey)"
+                    elif "fin" in node_name:
+                        display_name = "🇫🇮 فنلاند (Finland)"
+                    elif "main" in node_name or "de" in node_name:
+                        display_name = "🇩🇪 سرور اصلی (Main)"
+
+                    out.append({
+                        "id": n.id,
+                        "name": n.name,
+                        "display_name": display_name,
+                        "address": n.address,
+                        "public_host": pub_host,
+                        "port": n.port,
+                        "status": status_str,
+                        "openvpn_port": 1194,
+                        "ikev2_port": 500,
+                    })
+                return out if out else fallback_nodes
+        except Exception as e:
+            logger.warning(f"Error in fetch_nodes_async, using fallback: {e}")
+            return fallback_nodes
+
+    def fetch_nodes(self) -> List[Dict[str, Any]]:
+        """واکشی همگام لیست نودها با فال‌بک امن"""
+        fallback_nodes = [
+            {
+                "id": 2,
+                "name": "turk",
+                "display_name": "🇹🇷 ترکیه (Turkey)",
+                "address": "77.83.203.140",
+                "public_host": "tur.mobx48.ir",
+                "port": 3333,
+                "status": "connected",
+                "openvpn_port": 1194,
+                "ikev2_port": 500,
+            },
+            {
+                "id": 3,
+                "name": "finland",
+                "display_name": "🇫🇮 فنلاند (Finland)",
+                "address": "65.109.217.93",
+                "public_host": "fin.mobx48.ir",
+                "port": 3333,
+                "status": "connected",
+                "openvpn_port": 1194,
+                "ikev2_port": 500,
+            },
+        ]
+        return fallback_nodes

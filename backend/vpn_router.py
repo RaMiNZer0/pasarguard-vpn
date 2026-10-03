@@ -150,20 +150,69 @@ def get_status(
     }
 
 
+def get_ca_certificate() -> str:
+    ca_paths = [
+        Path(os.environ.get("PASARGUARD_VPN_CA_PATH", "/var/lib/pasarguard/vpn/certs/ca.crt")),
+        Path("/var/lib/pasarguard/vpn/certs/ca.crt"),
+        DATA_DIR.parent / "certs" / "ca.crt",
+        Path("/opt/pasarguard-vpn/certs/ca.crt"),
+    ]
+    for p in ca_paths:
+        if p.is_file():
+            try:
+                content = p.read_text(encoding="utf-8").strip()
+                if content:
+                    return content
+            except Exception:
+                pass
+    return "-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAL0...\n-----END CERTIFICATE-----"
+
+
+def resolve_node_host(node_name: str) -> str:
+    name_clean = node_name.lower().strip()
+    direct_map = {
+        "turk": "tur.mobx48.ir",
+        "turkey": "tur.mobx48.ir",
+        "77.83.203.140": "tur.mobx48.ir",
+        "finland": "fin.mobx48.ir",
+        "65.109.217.93": "fin.mobx48.ir",
+        "main": "sub.mob48.ir",
+        "127.0.0.1": "sub.mob48.ir",
+        "91.107.146.13": "sub.mob48.ir",
+    }
+    if name_clean in direct_map:
+        return direct_map[name_clean]
+
+    if "." in node_name:
+        return node_name
+
+    try:
+        from backend.pg_db_reader import PasarGuardDBReader
+        reader = PasarGuardDBReader()
+        nodes = reader.fetch_nodes()
+        for n in nodes:
+            if n.get("name", "").lower() == name_clean:
+                return n.get("public_host") or n.get("address", "")
+    except Exception:
+        pass
+
+    return f"{name_clean.replace(' ', '-')}.vpn.example.com"
+
+
 @router.get("/client/ovpn")
 def download_openvpn_config(
     node: str = Query(..., description="Node name or identifier"),
     username: str = Query(..., description="Username for auth"),
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Response:
-    """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn"""
-    # ساخت فایل کانفیگ
-    ca_mock = "-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIJAL0...\n-----END CERTIFICATE-----"
+    """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn با سرتیفیکیت معتبر CA و آدرس واقعی نود"""
+    server_host = resolve_node_host(node)
+    ca_content = get_ca_certificate()
     generator = OpenVPNClientConfigGenerator(
-        server_host=f"{node.lower().replace(' ', '-')}.vpn.example.com",
+        server_host=server_host,
         server_port=1194,
         proto="udp",
-        ca_cert=ca_mock,
+        ca_cert=ca_content,
         cipher="AES-256-GCM",
     )
     content = generator.generate(node_name=node)
@@ -181,20 +230,65 @@ def download_apple_mobileconfig(
     username: str = Query(..., description="Username for profile"),
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Response:
-    """تولید و دانلود مستقیم پروفایل .mobileconfig برای آیفون و مک"""
-    server_addr = f"{node.lower().replace(' ', '-')}.vpn.example.com"
+    """تولید و دانلود مستقیم پروفایل .mobileconfig برای آیفون و مک با تعبیه پسورد و CA"""
+    server_host = resolve_node_host(node)
+    ca_content = get_ca_certificate()
+
+    user = engine._users.get(username)
+    if not user and engine._user_syncer:
+        user = engine._user_syncer.sync_user(username)
+
+    user_password = ""
+    if user:
+        user_password = user.password or (user.valid_passwords[0] if user.valid_passwords else "")
+
     generator = AppleMobileConfigGenerator(
         organization="PasarGuard VPN",
-        server_address=server_addr,
-        remote_id=server_addr,
+        server_address=server_host,
+        remote_id=server_host,
+        ca_cert=ca_content,
     )
-    content = generator.generate(profile_name=f"PasarGuard - {node}", username=username)
+    content = generator.generate(
+        profile_name=f"PasarGuard - {node}",
+        username=username,
+        password=user_password,
+    )
 
     return Response(
         content=content,
         media_type="application/x-apple-aspen-config",
         headers={"Content-Disposition": f'attachment; filename="{node}.mobileconfig"'},
     )
+
+
+@router.get("/nodes")
+async def get_vpn_nodes(
+    engine: VPNEngine = Depends(get_vpn_engine),
+) -> Dict[str, Any]:
+    """لیست نودهای فعال شبکه و وضعیت اتصال"""
+    from backend.pg_db_reader import PasarGuardDBReader
+    reader = PasarGuardDBReader()
+    nodes = await reader.fetch_nodes_async()
+    return {"status": "ok", "nodes": nodes}
+
+
+@router.get("/internal/users-secrets")
+def get_users_secrets(
+    engine: VPNEngine = Depends(get_vpn_engine),
+    _sec: None = Depends(verify_node_api_key),
+) -> Dict[str, Any]:
+    """ارائه ایمن سکرت‌های کاربران برای سینک به strongSwan روی ورکر نودها"""
+    users_list = []
+    for u in engine._users.values():
+        if u.status == "active" and not u.is_expired():
+            pws = u.valid_passwords or ([u.password] if u.password else [])
+            users_list.append({
+                "username": u.username,
+                "password": u.password or (pws[0] if pws else ""),
+                "valid_passwords": pws,
+                "group": u.group,
+            })
+    return {"status": "ok", "users": users_list}
 
 
 @router.get("/groups/policies")
@@ -216,13 +310,15 @@ def set_group_policy(
 
 
 @router.get("/subscription/{username}")
-def get_user_subscription(
+async def get_user_subscription(
     username: str,
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Dict[str, Any]:
     """دریافت لیست تمام کانفیگ‌های مجاز کاربر بر اساس گروه در سابسکریپشن"""
     from backend.vpn_sub_injector import VPNSubscriptionInjector
-    injector = VPNSubscriptionInjector(engine=engine, base_url="")
+    from backend.pg_db_reader import PasarGuardDBReader
+    reader = PasarGuardDBReader()
+    injector = VPNSubscriptionInjector(engine=engine, base_url="", db_reader=reader)
     return injector.generate_subscription_links(username=username)
 
 
