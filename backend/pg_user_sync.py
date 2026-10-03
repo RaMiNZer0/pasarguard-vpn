@@ -59,6 +59,42 @@ class PasarGuardUserSync:
         self.engine._users[username] = user
         return user
 
+    async def sync_all_async(self) -> int:
+        """همگام‌سازی ناهمگام کامل تمام کاربران بدون مسدود کردن event loop"""
+        if not self.db_reader.is_available():
+            return 0
+
+        if hasattr(self.db_reader, "fetch_all_users_async"):
+            users_data = await self.db_reader.fetch_all_users_async()
+        else:
+            users_data = self.db_reader.fetch_all_users()
+
+        for u in users_data:
+            self._apply_user_dict(u)
+
+        if users_data:
+            self.engine._save_state()
+        self._last_sync_time = time.time()
+        logger.info(f"Synced {len(users_data)} users asynchronously from PasarGuard DB")
+        return len(users_data)
+
+    async def sync_user_async(self, username: str) -> Optional[VPNUser]:
+        """همگام‌سازی ناهمگام یک کاربر در لحظه درخواست اتصال"""
+        if not self.db_reader.is_available():
+            return None
+
+        if hasattr(self.db_reader, "fetch_user_async"):
+            u_data = await self.db_reader.fetch_user_async(username)
+        else:
+            u_data = self.db_reader.fetch_user(username)
+
+        if not u_data:
+            return None
+
+        user = self._apply_user_dict(u_data)
+        self.engine._save_state()
+        return user
+
     def sync_all(self) -> int:
         """همگام‌سازی کامل تمام کاربران از دیتابیس پاسارگارد"""
         if not self.db_reader.is_available():

@@ -168,6 +168,7 @@ class PasarGuardDBReader:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
+                # اگر در لوپ در حال اجرا هستیم و متد sync فراخوانی شده
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     return pool.submit(asyncio.run, _query()).result()
@@ -177,6 +178,67 @@ class PasarGuardDBReader:
         except Exception as e:
             logger.error(f"Error reading from app.db: {e}")
             return []
+
+    async def fetch_all_users_async(self) -> List[Dict[str, Any]]:
+        """واکشی تمام رکوردهای کاربران در محیط Asynchronous بدون تداخل event loop"""
+        if _HAS_APP_DB:
+            from app.db.base import GetDB
+            from app.db.models import User
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            async with GetDB() as db:
+                stmt = select(User).options(selectinload(User.groups))
+                res = await db.execute(stmt)
+                users = res.scalars().all()
+                out = []
+                for u in users:
+                    pws = self._extract_passwords_from_proxy_settings(u.proxy_settings)
+                    groups = [g.name for g in u.groups] if getattr(u, "groups", None) else ["default"]
+                    expire_ts = int(u.expire.timestamp()) if getattr(u, "expire", None) and hasattr(u.expire, "timestamp") else 0
+                    status_str = u.status.value if hasattr(u.status, "value") else str(u.status).lower()
+                    out.append({
+                        "id": u.id,
+                        "username": u.username,
+                        "status": status_str,
+                        "used_traffic": int(u.used_traffic or 0),
+                        "data_limit": int(u.data_limit or 0),
+                        "expire": expire_ts,
+                        "valid_passwords": list(pws),
+                        "groups": groups,
+                    })
+                return out
+        return self.fetch_all_users()
+
+    async def fetch_user_async(self, username: str) -> Optional[Dict[str, Any]]:
+        """واکشی آنی یک کاربر در محیط Asynchronous"""
+        if _HAS_APP_DB:
+            from app.db.base import GetDB
+            from app.db.models import User
+            from sqlalchemy import select
+            from sqlalchemy.orm import selectinload
+
+            async with GetDB() as db:
+                stmt = select(User).options(selectinload(User.groups)).where(User.username == username)
+                res = await db.execute(stmt)
+                u = res.scalar_one_or_none()
+                if not u:
+                    return None
+                pws = self._extract_passwords_from_proxy_settings(u.proxy_settings)
+                groups = [g.name for g in u.groups] if getattr(u, "groups", None) else ["default"]
+                expire_ts = int(u.expire.timestamp()) if getattr(u, "expire", None) and hasattr(u.expire, "timestamp") else 0
+                status_str = u.status.value if hasattr(u.status, "value") else str(u.status).lower()
+                return {
+                    "id": u.id,
+                    "username": u.username,
+                    "status": status_str,
+                    "used_traffic": int(u.used_traffic or 0),
+                    "data_limit": int(u.data_limit or 0),
+                    "expire": expire_ts,
+                    "valid_passwords": list(pws),
+                    "groups": groups,
+                }
+        return self.fetch_user(username)
 
     def fetch_all_users(self) -> List[Dict[str, Any]]:
         """واکشی تمام رکوردهای کاربران همراه با گروه‌ها و سهمیه‌ها"""

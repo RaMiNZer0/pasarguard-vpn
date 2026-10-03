@@ -247,7 +247,7 @@ def get_nodes_health(
 
 
 @router.post("/sync")
-def trigger_db_sync(
+async def trigger_db_sync(
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Dict[str, Any]:
     """همگام‌سازی دستی کاربران با دیتابیس پاسارگارد"""
@@ -256,7 +256,10 @@ def trigger_db_sync(
     if not syncer:
         syncer = PasarGuardUserSync(engine=engine)
         engine.set_user_syncer(syncer)
-    count = syncer.sync_all()
+    if hasattr(syncer, "sync_all_async"):
+        count = await syncer.sync_all_async()
+    else:
+        count = syncer.sync_all()
     return {"success": True, "synced_users_count": count, "message": f"Successfully synced {count} users from PasarGuard"}
 
 
