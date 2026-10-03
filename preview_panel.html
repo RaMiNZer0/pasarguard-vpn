@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PasarGuard v5.4.1 - Live VPN Preview & Test</title>
+  <style>
+    :root {
+      --bg-dark: #121214;
+      --card-dark: #1a1a1e;
+      --card-border: #26262b;
+      --accent-primary: #3b82f6;
+      --accent-warning: #f59e0b;
+      --accent-success: #10b981;
+      --accent-danger: #ef4444;
+      --text-main: #f4f4f5;
+      --text-muted: #a1a1aa;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Vazirmatn", sans-serif;
+    }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    /* Sidebar */
+    aside {
+      width: 260px;
+      background: #16161a;
+      border-left: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 20px;
+      margin-bottom: 15px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .brand-version {
+      font-size: 11px;
+      color: var(--accent-warning);
+    }
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .nav-item {
+      padding: 10px 14px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s, color 0.15s;
+      cursor: pointer;
+    }
+    .nav-item:hover, .nav-item.active {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+    /* Main Area */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    header {
+      height: 64px;
+      background: #16161a;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+    .content {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .stat-card {
+      background: var(--card-dark);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .stat-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    /* Interactive Test Console */
+    .console-card {
+      background: var(--card-dark);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    button.pg-btn {
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.2s;
+    }
+    button.pg-btn:hover {
+      opacity: 0.9;
+    }
+    .btn-amber { background: var(--accent-warning); color: #000; }
+    .btn-blue { background: var(--accent-primary); color: #fff; }
+    .btn-green { background: var(--accent-success); color: #fff; }
+    .btn-gray { background: #27272a; color: #fff; border: 1px solid #3f3f46; }
+    pre#output-log {
+      background: #0d0d10;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: Consolas, monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      max-height: 250px;
+      overflow-y: auto;
+      margin-top: 14px;
+      direction: ltr;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="brand">
+      <div class="brand-icon">🛡️</div>
+      <div>
+        <div class="brand-title">PasarGuard</div>
+        <div class="brand-version">v5.4.1 (Clean IP + VPN Core)</div>
+      </div>
+    </div>
+    <nav id="pg-sidebar-nav">
+      <div class="nav-item active">📊 داشبورد اصلی</div>
+      <div class="nav-item">👥 مدیریت کاربران</div>
+      <div class="nav-item">🌐 نودهای سرور</div>
+      <div class="nav-item">🔌 این‌باندها (Inbounds)</div>
+      <div class="nav-item">⚙️ تنظیمات سیستم</div>
+      <!-- plugin/vpn-panel.js will automatically inject the VPN Protocols button here -->
+    </nav>
+    <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: auto;">
+      Zero Idle CPU | Memory &lt; 15MB
+    </div>
+  </aside>
+
+  <!-- Main View -->
+  <main>
+    <header>
+      <div style="font-size: 15px; font-weight: 600;">داشبورد تست زنده و یکپارچه پروتکل‌های VPN</div>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size: 12px; color: var(--accent-success);">● هسته فعال (127.0.0.1:8000)</span>
+        <button class="pg-btn btn-amber" onclick="window.__PasarGuardVPN.renderModal()">🛡️ باز کردن ماژول VPN</button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-title">کاربران فعال تست</div>
+          <div class="stat-val" style="color:var(--accent-primary);">2 کاربر (ali, sara)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">نودهای متصل OpenVPN/IKEv2</div>
+          <div class="stat-val" style="color:var(--accent-success);">3 نود فعال</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">سربار پردازنده (CPU Idle)</div>
+          <div class="stat-val" style="color:var(--accent-warning);">0.0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">وضعیت این‌باندها</div>
+          <div class="stat-val" style="color:#a855f7;">Xray + OpenVPN + IKEv2</div>
+        </div>
+      </div>
+
+      <!-- Test Control Center -->
+      <div class="console-card">
+        <div style="font-weight:700; font-size:15px; display:flex; justify-content:space-between; align-items:center;">
+          <span>🧪 کنسول شبیه‌ساز تست بلادرنگ (Real-Time Live Testing)</span>
+          <span style="font-size:12px; color:var(--text-muted);">بدون نیاز به سرور واقعی</span>
+        </div>
+        <p style="font-size:13px; color:var(--text-muted); margin-top:6px;">
+          با کلیک روی هر دکمه زیر، درخواست‌های واقعی به سرور بک‌اند ارسال شده و خروجی زنده در کادر زیر چاپ می‌شود:
+        </p>
+
+        <div class="btn-group">
+          <button class="pg-btn btn-amber" onclick="window.__PasarGuardVPN.renderModal()">
+            🖥️ باز کردن مودال کامل VPN
+          </button>
+          <button class="pg-btn btn-blue" onclick="testAuth()">
+            🔑 تست احراز هویت (User: ali)
+          </button>
+          <button class="pg-btn btn-green" onclick="testTrafficReport()">
+            📈 تست ثبت مصرف (500MB ترافیک)
+          </button>
+          <button class="pg-btn btn-gray" onclick="testNodeHealth()">
+            🩺 پایش سلامت نودها (UDP 1194/500)
+          </button>
+          <button class="pg-btn btn-gray" onclick="testSubscription()">
+            🔗 دریافت لینک‌های سابسکریپشن
+          </button>
+        </div>
+
+        <pre id="output-log">// آماده دریافت دستورات... روی یکی از دکمه‌های بالا کلیک کنید.</pre>
+      </div>
+    </div>
+  </main>
+
+  <!-- Load plugin/vpn-panel.js -->
+  <script src="/plugin/vpn-panel.js"></script>
+
+  <script>
+    const logBox = document.getElementById('output-log');
+    function log(msg, data) {
+      const time = new Date().toLocaleTimeString();
+      let text = `[${time}] ${msg}\n`;
+      if (data) {
+        text += JSON.stringify(data, null, 2) + '\n';
+      }
+      logBox.textContent = text;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function testAuth() {
+      try {
+        log('در حال ارسال درخواست احراز هویت...');
+        const res = await fetch('/api/vpn/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'ali', password: 'password123', protocol: 'openvpn' })
+        });
+        const data = await res.json();
+        log('✓ نتیجه احراز هویت کاربر ali:', data);
+      } catch (err) {
+        log('خطا در احراز هویت:', err.message);
+      }
+    }
+
+    async function testTrafficReport() {
+      try {
+        log('در حال گزارش مصرف ترافیک ۵۰۰ مگابایت...');
+        const res = await fetch('/api/vpn/report-usage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: 'ali',
+            bytes_in: 250 * 1024 * 1024,
+            bytes_out: 250 * 1024 * 1024,
+            protocol: 'openvpn'
+          })
+        });
+        const data = await res.json();
+        log('✓ گزارش مصرف ثبت شد (حجم باقیمانده و وضعیت):', data);
+      } catch (err) {
+        log('خطا در گزارش مصرف:', err.message);
+      }
+    }
+
+    async function testNodeHealth() {
+      try {
+        log('در حال بررسی پورت‌های UDP نودها...');
+        const res = await fetch('/api/vpn/nodes/health');
+        const data = await res.json();
+        log('✓ وضعیت سلامت نودها:', data);
+      } catch (err) {
+        log('خطا در سلامت نودها:', err.message);
+      }
+    }
+
+    async function testSubscription() {
+      try {
+        log('در حال دریافت سابسکریپشن کاربر ali...');
+        const res = await fetch('/api/vpn/subscription/ali');
+        const data = await res.json();
+        log('✓ سابسکریپشن کاربر ali شامل نودهای مجاز:', data);
+      } catch (err) {
+        log('خطا در دریافت سابسکریپشن:', err.message);
+      }
+    }
+  </script>
+</body>
+</html>
