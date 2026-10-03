@@ -21,10 +21,12 @@ app = FastAPI(
     description="Modular VPN Extension (OpenVPN, IKEv2, L2TP) for PasarGuard",
 )
 
-# CORS Support for local browser testing
+panel_origin = os.environ.get("PASARGUARD_PANEL_ORIGIN", "*")
+allowed_origins = [o.strip() for o in panel_origin.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

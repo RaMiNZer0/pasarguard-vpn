@@ -45,26 +45,36 @@ if [[ "${MODE}" == "--node" || "${MODE}" == "node" ]]; then
   apt-get update -y
   apt-get install -y openvpn strongswan strongswan-pki libcharon-extra-plugins xl2tpd ppp iptables
 
-  mkdir -p /opt/pasarguard-vpn/node_worker
+  mkdir -p /opt/pasarguard-vpn/node_worker /opt/pasarguard-vpn/systemd
   fetch_file "node_worker/pg_vpn_hook.py" "/opt/pasarguard-vpn/node_worker/pg_vpn_hook.py"
-  chmod +x /opt/pasarguard-vpn/node_worker/pg_vpn_hook.py
+  fetch_file "node_worker/vici_poller.py" "/opt/pasarguard-vpn/node_worker/vici_poller.py"
+  fetch_file "node_worker/local_cache.py" "/opt/pasarguard-vpn/node_worker/local_cache.py"
+  fetch_file "node_worker/circuit_breaker.py" "/opt/pasarguard-vpn/node_worker/circuit_breaker.py"
+  fetch_file "node_worker/__init__.py" "/opt/pasarguard-vpn/node_worker/__init__.py"
+  fetch_file "systemd/pg-vpn-vici-poller.service" "/etc/systemd/system/pg-vpn-vici-poller.service" 2>/dev/null || true
+  chmod +x /opt/pasarguard-vpn/node_worker/*.py
 
-  echo -e "${GREEN}✓ Node worker hooks installed at /opt/pasarguard-vpn/node_worker/pg_vpn_hook.py${NC}"
+  echo -e "${GREEN}✓ Node worker hooks & VICI poller installed at /opt/pasarguard-vpn/node_worker/${NC}"
   exit 0
 fi
 
 # Default: Master Panel Mode
 echo -e "\n${YELLOW}[1/4] Preparing directories on master panel...${NC}"
-mkdir -p "${INSTALL_DIR}/backend" "${INSTALL_DIR}/plugin" "${DATA_DIR}" "${PYTHON_DIR}"
+mkdir -p "${INSTALL_DIR}/backend" "${INSTALL_DIR}/plugin" "${INSTALL_DIR}/certs" "${DATA_DIR}" "${PYTHON_DIR}"
 
 echo -e "${YELLOW}[2/4] Fetching extension files...${NC}"
 fetch_file "backend/vpn_engine.py" "${INSTALL_DIR}/backend/vpn_engine.py"
 fetch_file "backend/vpn_router.py" "${INSTALL_DIR}/backend/vpn_router.py"
 fetch_file "backend/vpn_sub_injector.py" "${INSTALL_DIR}/backend/vpn_sub_injector.py"
+fetch_file "backend/pg_db_reader.py" "${INSTALL_DIR}/backend/pg_db_reader.py"
+fetch_file "backend/pg_user_sync.py" "${INSTALL_DIR}/backend/pg_user_sync.py"
 fetch_file "backend/__init__.py" "${INSTALL_DIR}/backend/__init__.py"
 fetch_file "plugin/vpn-panel.js" "${INSTALL_DIR}/plugin/vpn-panel.js"
 fetch_file "plugin/integrate-dashboard.sh" "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
 chmod +x "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
+fetch_file "certs/generate_ca.sh" "${INSTALL_DIR}/certs/generate_ca.sh"
+chmod +x "${INSTALL_DIR}/certs/generate_ca.sh"
+fetch_file "config.env.example" "${INSTALL_DIR}/config.env.example"
 fetch_file "version.json" "${INSTALL_DIR}/version.json"
 
 # Copy python modules

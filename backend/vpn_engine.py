@@ -44,6 +44,14 @@ class VPNUser:
     used_traffic: int = 0
     expire: int = 0  # unix timestamp, 0 means no expiry
     group: str = "default"
+    valid_passwords: List[str] = field(default_factory=list)
+
+    def check_password(self, candidate: str) -> bool:
+        if self.password and self.password == candidate:
+            return True
+        if self.valid_passwords and candidate in self.valid_passwords:
+            return True
+        return False
 
     @property
     def remaining_bytes(self) -> int:
@@ -82,7 +90,12 @@ class VPNEngine:
         # حافظه نهان فوق‌سریع در RAM (In-Memory Cache) برای جلوگیری از I/O دیسک
         self._users: Dict[str, VPNUser] = {}
         self._group_policies: Dict[str, List[str]] = {}
+        self._user_syncer: Optional[Any] = None
         self._load_state()
+
+    def set_user_syncer(self, syncer: Any) -> None:
+        """اتصال همگام‌ساز خودکار با دیتابیس پاسارگارد"""
+        self._user_syncer = syncer
 
     def _load_state(self) -> None:
         """بارگذاری داده‌ها از دیسک به حافظه رم در زمان راه‌اندازی"""
@@ -91,7 +104,10 @@ class VPNEngine:
                 with open(self.users_file, "r", encoding="utf-8") as f:
                     raw_users = json.load(f)
                     for u in raw_users:
-                        user = VPNUser(**u)
+                        # حذف فیلدهای احتمالی ناشناخته
+                        known_keys = {"username", "password", "status", "data_limit", "used_traffic", "expire", "group", "valid_passwords"}
+                        filtered = {k: v for k, v in u.items() if k in known_keys}
+                        user = VPNUser(**filtered)
                         self._users[user.username] = user
             except Exception as e:
                 logger.error(f"Error loading VPN users: {e}")
@@ -122,6 +138,7 @@ class VPNEngine:
         used_traffic: int = 0,
         expire: int = 0,
         group: str = "default",
+        valid_passwords: Optional[List[str]] = None,
     ) -> None:
         """ثبت یا به‌روزرسانی اطلاعات کاربر برای اعتبارسنجی"""
         self._users[username] = VPNUser(
@@ -132,6 +149,7 @@ class VPNEngine:
             used_traffic=used_traffic,
             expire=expire,
             group=group,
+            valid_passwords=valid_passwords or ([password] if password else []),
         )
         self._save_state()
 
@@ -146,6 +164,9 @@ class VPNEngine:
         فراخوانی توسط هوک‌های OpenVPN، IKEv2 و L2TP.
         """
         user = self._users.get(username)
+        if not user and self._user_syncer:
+            user = self._user_syncer.sync_user(username)
+
         if not user:
             return VPNAuthResult(
                 allowed=False,
@@ -153,12 +174,16 @@ class VPNEngine:
                 reason="User not found",
             )
 
-        if user.password != password:
-            return VPNAuthResult(
-                allowed=False,
-                username=username,
-                reason="Invalid credentials",
-            )
+        if not user.check_password(password):
+            # اگر پسورد نادرست بود، ممکن است در پنل تغییر کرده باشد؛ یک بار از DB همگام کن
+            if self._user_syncer:
+                user = self._user_syncer.sync_user(username) or user
+            if not user.check_password(password):
+                return VPNAuthResult(
+                    allowed=False,
+                    username=username,
+                    reason="Invalid credentials",
+                )
 
         if user.status == "expired" or user.is_expired():
             return VPNAuthResult(

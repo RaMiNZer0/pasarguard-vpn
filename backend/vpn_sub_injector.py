@@ -7,6 +7,7 @@ and real-time UDP port health monitoring across multi-location nodes.
 
 from __future__ import annotations
 
+import os
 import time
 import socket
 from typing import Any, Dict, List, Optional
@@ -109,7 +110,7 @@ class VPNSubscriptionInjector:
                     "server_address": f"{node_slug}.vpn.example.com",
                     "username": username,
                     "password": user.password,
-                    "psk": "PasarGuardVPN123",
+                    "psk": os.environ.get("VPN_L2TP_PSK", "PasarGuardVPN123"),
                 },
             })
 

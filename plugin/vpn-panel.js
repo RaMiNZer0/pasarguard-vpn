@@ -316,8 +316,12 @@
           </div>
         </div>
         <div style="font-size:13px; font-weight:700; margin-bottom:8px;">نشست‌های زنده (Active Sessions):</div>
-        <div style="background:#202024; border:1px solid #27272a; border-radius:10px; padding:12px; font-size:12px; color:#a1a1aa;">
+        <div style="background:#202024; border:1px solid #27272a; border-radius:10px; padding:12px; font-size:12px; color:#a1a1aa; margin-bottom:14px;">
           در حال حاضر هیچ کاربر متصلی در نشست فعال قرار ندارد. به محض اتصال، بایت‌های دریافتی/ارسالی به صورت زنده نمایش داده می‌شوند.
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; background:#202024; border:1px solid #27272a; border-radius:10px; padding:12px;">
+          <button id="btn-sync-now" class="pg-vpn-btn" style="background:#10b981; color:#fff; cursor:pointer;">🔄 همگام‌سازی فوری با دیتابیس پاسارگارد (Sync DB)</button>
+          <span id="sync-status-msg" style="font-size:12px; color:#a1a1aa;">آخرین وضعیت: آماده همگام‌سازی</span>
         </div>
       `;
     }
@@ -350,6 +354,27 @@
       if (userInp) userInp.oninput = updateLinks;
       if (nodeSel) nodeSel.onchange = updateLinks;
       updateLinks();
+    }
+
+    if (tab === 'status') {
+      const syncBtn = document.getElementById('btn-sync-now');
+      const statusMsg = document.getElementById('sync-status-msg');
+      if (syncBtn) {
+        syncBtn.onclick = async () => {
+          syncBtn.disabled = true;
+          syncBtn.innerText = 'در حال همگام‌سازی... ⏳';
+          try {
+            const res = await fetch(`${API_BASE}/sync`, { method: 'POST' });
+            const data = await res.json();
+            if (statusMsg) statusMsg.innerText = `✅ ${data.message || 'همگام‌سازی موفق'}`;
+          } catch (e) {
+            if (statusMsg) statusMsg.innerText = `❌ خطا در ارتباط: ${e.message}`;
+          } finally {
+            syncBtn.disabled = false;
+            syncBtn.innerText = '🔄 همگام‌سازی فوری با دیتابیس پاسارگارد (Sync DB)';
+          }
+        };
+      }
     }
   }
 

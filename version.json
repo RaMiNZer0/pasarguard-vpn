@@ -1,6 +1,6 @@
 {
   "name": "pasarguard-vpn",
-  "version": "1.0.0",
-  "description": "PasarGuard Unified VPN Extension (OpenVPN, IKEv2, L2TP/IPsec)",
+  "version": "1.1.0",
+  "description": "PasarGuard Unified VPN Extension (OpenVPN, IKEv2, L2TP/IPsec) - Production Ready",
   "updated_at": "2026-10-03"
 }

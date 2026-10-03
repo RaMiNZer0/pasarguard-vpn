@@ -1,0 +1,17 @@
+[Unit]
+Description=PasarGuard Unified VPN strongSwan IKEv2 Traffic Poller
+After=network.target strongswan.service strongswan-starter.service
+Wants=strongswan.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/pasarguard-vpn/node_worker/vici_poller.py
+Restart=always
+RestartSec=10
+MemoryLimit=25M
+CPUQuota=5%
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

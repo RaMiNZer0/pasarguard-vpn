@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from backend.vpn_engine import (
@@ -21,6 +21,19 @@ from backend.vpn_engine import (
 )
 
 router = APIRouter(prefix="/api/vpn", tags=["VPN"])
+
+def verify_node_api_key(
+    authorization: Optional[str] = Header(None),
+) -> None:
+    """اعتبارسنجی امن توکن نود برای جلوگیری از درخواست‌های غیرمجاز"""
+    expected_key = os.environ.get("PASARGUARD_NODE_API_KEY", "").strip()
+    if not expected_key:
+        return  # اگر متغیر ست نشده باشد، باز می‌ماند (حالت توسعه یا تک‌سرور)
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized: Node API Key missing")
+    token = authorization.split("Bearer ", 1)[1].strip()
+    if token != expected_key:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Node API Key")
 
 # Default data directory
 DATA_DIR = Path(os.environ.get("PASARGUARD_VPN_DATA_DIR", "/opt/pasarguard-cleanip/data/vpn"))
@@ -64,6 +77,7 @@ class GroupPolicyRequest(BaseModel):
 def authenticate(
     payload: AuthRequest,
     engine: VPNEngine = Depends(get_vpn_engine),
+    _sec: None = Depends(verify_node_api_key),
 ) -> Dict[str, Any]:
     """احراز هویت بلادرنگ کلاینت‌ها (Real-Time Auth)"""
     result = engine.authenticate_user(
@@ -83,6 +97,7 @@ def authenticate(
 def report_usage(
     payload: UsageReportRequest,
     engine: VPNEngine = Depends(get_vpn_engine),
+    _sec: None = Depends(verify_node_api_key),
 ) -> Dict[str, Any]:
     """گزارش مصرف ترافیک و بررسی وضعیت سهمیه (Accounting)"""
     report = engine.report_traffic(
@@ -201,3 +216,32 @@ def get_nodes_health(
         )
         results.append(health)
     return {"status": "ok", "nodes": results}
+
+
+@router.post("/sync")
+def trigger_db_sync(
+    engine: VPNEngine = Depends(get_vpn_engine),
+) -> Dict[str, Any]:
+    """همگام‌سازی دستی کاربران با دیتابیس پاسارگارد"""
+    from backend.pg_user_sync import PasarGuardUserSync
+    syncer = getattr(engine, "_user_syncer", None)
+    if not syncer:
+        syncer = PasarGuardUserSync(engine=engine)
+        engine.set_user_syncer(syncer)
+    count = syncer.sync_all()
+    return {"success": True, "synced_users_count": count, "message": f"Successfully synced {count} users from PasarGuard"}
+
+
+@router.get("/sync/status")
+def get_sync_status(
+    engine: VPNEngine = Depends(get_vpn_engine),
+) -> Dict[str, Any]:
+    """وضعیت آخرین همگام‌سازی با دیتابیس پاسارگارد"""
+    syncer = getattr(engine, "_user_syncer", None)
+    last_sync = getattr(syncer, "_last_sync_time", 0.0) if syncer else 0.0
+    return {
+        "is_syncer_active": syncer is not None,
+        "last_sync_timestamp": last_sync,
+        "cached_users_count": len(engine._users),
+    }
+

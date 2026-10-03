@@ -22,6 +22,20 @@ from typing import Any, Dict, Optional
 MASTER_URL = os.environ.get("PASARGUARD_MASTER_URL", "").rstrip("/")
 API_TOKEN = os.environ.get("PASARGUARD_NODE_API_KEY", "")
 
+try:
+    from node_worker.local_cache import LocalAuthCache
+    from node_worker.circuit_breaker import CircuitBreaker
+except ImportError:
+    try:
+        from local_cache import LocalAuthCache
+        from circuit_breaker import CircuitBreaker
+    except ImportError:
+        LocalAuthCache = None
+        CircuitBreaker = None
+
+_local_cache = LocalAuthCache() if LocalAuthCache else None
+_circuit_breaker = CircuitBreaker() if CircuitBreaker else None
+
 
 def _call_master_api(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     """ارسال امن و سریع درخواست به پنل مستر در حالت مالتی‌نود"""
@@ -46,7 +60,7 @@ def _call_master_api(endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def handle_openvpn_auth_cli(auth_file: str, engine: Optional[Any] = None) -> int:
     """
-    هوک احراز هویت اوپن‌وی‌پی‌ان
+    هوک احراز هویت اوپن‌وی‌پی‌ان با کش محلی و Failsafe در زمان قطعی مستر.
     کد خروجی ۰ یعنی تایید و کد ۱ یعنی رد اتصال.
     """
     try:
@@ -59,16 +73,34 @@ def handle_openvpn_auth_cli(auth_file: str, engine: Optional[Any] = None) -> int
         # ۱. اگر انجین محلی پاس داده شده باشد (تک‌سرور یا تست)
         if engine is not None:
             res = engine.authenticate_user(username, password, protocol="openvpn")
+            if _local_cache:
+                if res.allowed:
+                    _local_cache.set(username, True, password)
+                else:
+                    _local_cache.invalidate(username)
             return 0 if res.allowed else 1
 
         # ۲. اگر در حالت مالتی‌نود باشد و آدرس مستر تعریف شده باشد
         if MASTER_URL:
-            res = _call_master_api("/api/vpn/auth", {
-                "username": username,
-                "password": password,
-                "protocol": "openvpn",
-            })
-            return 0 if res.get("allowed") else 1
+            try:
+                caller = _circuit_breaker.call if _circuit_breaker else lambda f, *a, **kw: f(*a, **kw)
+                res = caller(_call_master_api, "/api/vpn/auth", {
+                    "username": username,
+                    "password": password,
+                    "protocol": "openvpn",
+                })
+                allowed = bool(res.get("allowed"))
+                if _local_cache:
+                    if allowed:
+                        _local_cache.set(username, True, password)
+                    else:
+                        _local_cache.invalidate(username)
+                return 0 if allowed else 1
+            except Exception:
+                # Failsafe fallback: اگر ارتباط با مستر قطع است، از کش معتبر استفاده کن
+                if _local_cache and _local_cache.get(username, password) is True:
+                    return 0
+                return 1
 
         # ۳. فال‌بک به انجین محلی پیش‌فرض
         from backend.vpn_engine import VPNEngine
@@ -91,18 +123,22 @@ def handle_openvpn_disconnect_cli(
     bytes_out = int(current_env.get("bytes_sent", "0"))
 
     if engine is not None:
-        return engine.report_traffic(username, bytes_in, bytes_out, protocol="openvpn")
-
-    if MASTER_URL:
-        return _call_master_api("/api/vpn/report-usage", {
+        report = engine.report_traffic(username, bytes_in, bytes_out, protocol="openvpn")
+    elif MASTER_URL:
+        report = _call_master_api("/api/vpn/report-usage", {
             "username": username,
             "bytes_in": bytes_in,
             "bytes_out": bytes_out,
             "protocol": "openvpn",
         })
+    else:
+        from backend.vpn_engine import VPNEngine
+        report = VPNEngine().report_traffic(username, bytes_in, bytes_out, protocol="openvpn")
 
-    from backend.vpn_engine import VPNEngine
-    return VPNEngine().report_traffic(username, bytes_in, bytes_out, protocol="openvpn")
+    if report.get("should_kill") and _local_cache:
+        _local_cache.invalidate(username)
+
+    return report
 
 
 def handle_l2tp_ip_down_cli(
