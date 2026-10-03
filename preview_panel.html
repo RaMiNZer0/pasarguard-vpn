@@ -187,13 +187,21 @@
         <div class="brand-version">v5.4.1 (Clean IP + VPN Core)</div>
       </div>
     </div>
-    <nav id="pg-sidebar-nav">
-      <div class="nav-item active">📊 داشبورد اصلی</div>
-      <div class="nav-item">👥 مدیریت کاربران</div>
-      <div class="nav-item">🌐 نودهای سرور</div>
-      <div class="nav-item">🔌 این‌باندها (Inbounds)</div>
-      <div class="nav-item">⚙️ تنظیمات سیستم</div>
-      <!-- plugin/vpn-panel.js will automatically inject the VPN Protocols button here -->
+    <nav data-sidebar="menu" id="pg-sidebar-nav">
+      <ul class="flex-col" style="display:flex; flex-direction:column; gap:6px; list-style:none;">
+        <li class="nav-item active">📊 داشبورد اصلی</li>
+        <li class="nav-item">👥 مدیریت کاربران</li>
+        <li class="nav-item">🌐 نودهای سرور</li>
+        <li class="nav-item">🔌 این‌باندها (Inbounds)</li>
+        <li class="nav-item">⚙️ تنظیمات سیستم</li>
+        <li style="padding: 2px 8px; list-style: none;">
+          <button type="button" onclick="alert('سرویس Clean IP نیز در پنل در دسترس است.')" style="width:100%; display:flex; align-items:center; gap:10px; padding:8px 12px; font-size:12px; font-weight:500; border-radius:8px; color:#10b981; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.2); cursor:pointer;">
+            <span style="font-size:14px;">🛡️</span>
+            <span>Clean IP Auto-Pilot</span>
+            <span style="margin-right:auto; width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+          </button>
+        </li>
+      </ul>
     </nav>
     <div style="font-size: 11px; color: var(--text-muted); text-align: center; margin-top: auto;">
       Zero Idle CPU | Memory &lt; 15MB

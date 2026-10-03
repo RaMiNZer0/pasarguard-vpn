@@ -358,26 +358,77 @@
     renderModal();
   }
 
-  // اضافه کردن تب به نوار منوی اصلی پاسارگارد
+  const FLOATING_BTN_ID = 'pg-vpn-floating-pill';
+
+  // اضافه کردن تب و دکمه شناور به پنل پاسارگارد (دقیقاً مشابه Clean IP)
   function injectNavButton() {
-    if (document.getElementById(NAV_BTN_ID)) return;
-    const nav = document.querySelector('nav, .platform-menu, aside');
-    if (!nav) return;
+    injectStyles();
 
-    const btn = document.createElement('div');
-    btn.id = NAV_BTN_ID;
-    btn.innerHTML = `🛡️ <span style="font-size:13px; font-weight:600;">VPN Protocols</span>`;
-    btn.style.cssText = `
-      display: flex; align-items: center; gap: 8px; padding: 10px 16px;
-      margin: 8px 12px; border-radius: 8px; cursor: pointer;
-      background: rgba(245, 158, 11, 0.1); color: #f59e0b;
-      border: 1px solid rgba(245, 158, 11, 0.3); transition: all 0.2s;
-    `;
-    btn.onmouseover = () => { btn.style.background = 'rgba(245, 158, 11, 0.2)'; };
-    btn.onmouseout = () => { btn.style.background = 'rgba(245, 158, 11, 0.1)'; };
-    btn.onclick = () => renderModal();
+    // ۱. دکمه شناور در گوشه صفحه (Floating Pill)
+    if (!document.getElementById(FLOATING_BTN_ID)) {
+      const floatBtn = document.createElement('button');
+      floatBtn.id = FLOATING_BTN_ID;
+      floatBtn.type = 'button';
+      floatBtn.style.cssText = `
+        position: fixed !important;
+        bottom: 22px !important;
+        left: 22px !important;
+        z-index: 9999 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        padding: 9px 16px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        border-radius: 9999px !important;
+        color: #f59e0b !important;
+        background: rgba(24, 24, 27, 0.94) !important;
+        border: 1px solid rgba(245, 158, 11, 0.4) !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        cursor: pointer !important;
+        direction: rtl !important;
+      `;
+      floatBtn.innerHTML = `
+        <span style="font-size:15px;">🛡️</span>
+        <span>مدیریت VPN</span>
+        <span style="width:7px; height:7px; border-radius:50%; background:#f59e0b; display:inline-block;"></span>
+      `;
+      floatBtn.onclick = (e) => {
+        e.preventDefault();
+        const existing = document.getElementById(MODAL_ID);
+        if (existing) {
+          existing.remove();
+        } else {
+          renderModal();
+        }
+      };
+      document.body.appendChild(floatBtn);
+    }
 
-    nav.appendChild(btn);
+    // ۲. آیتم اختصاصی در سایدبار پنل پاسارگارد (Sidebar Integration)
+    if (!document.getElementById(NAV_BTN_ID)) {
+      const menuList = document.querySelector('[data-sidebar="menu"], aside nav ul, nav[data-sidebar="menu"], ul.flex-col, aside nav, nav, aside');
+      if (menuList) {
+        const isUl = menuList.tagName.toLowerCase() === 'ul';
+        const el = document.createElement(isUl ? 'li' : 'div');
+        el.id = NAV_BTN_ID;
+        el.style.cssText = 'padding: 2px 8px !important; list-style: none !important; margin: 4px 0 !important;';
+        el.innerHTML = `
+          <button type="button" style="width:100%; display:flex; align-items:center; gap:10px; padding:9px 12px; font-size:13px; font-weight:600; border-radius:8px; color:#f59e0b; background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.25); cursor:pointer; text-align:right;">
+            <span style="font-size:15px;">🛡️</span>
+            <span>مدیریت پروتکل‌های VPN</span>
+            <span style="margin-right:auto; font-size:10px; background:rgba(245,158,11,0.2); padding:2px 6px; border-radius:4px;">OpenVPN / IKEv2</span>
+          </button>
+        `;
+        el.onclick = (e) => {
+          e.preventDefault();
+          renderModal();
+        };
+        menuList.appendChild(el);
+      }
+    }
   }
 
   // اجرای امن و بدون کرش

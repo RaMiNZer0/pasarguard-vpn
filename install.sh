@@ -60,8 +60,11 @@ mkdir -p "${INSTALL_DIR}/backend" "${INSTALL_DIR}/plugin" "${DATA_DIR}" "${PYTHO
 echo -e "${YELLOW}[2/4] Fetching extension files...${NC}"
 fetch_file "backend/vpn_engine.py" "${INSTALL_DIR}/backend/vpn_engine.py"
 fetch_file "backend/vpn_router.py" "${INSTALL_DIR}/backend/vpn_router.py"
+fetch_file "backend/vpn_sub_injector.py" "${INSTALL_DIR}/backend/vpn_sub_injector.py"
 fetch_file "backend/__init__.py" "${INSTALL_DIR}/backend/__init__.py"
 fetch_file "plugin/vpn-panel.js" "${INSTALL_DIR}/plugin/vpn-panel.js"
+fetch_file "plugin/integrate-dashboard.sh" "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
+chmod +x "${INSTALL_DIR}/plugin/integrate-dashboard.sh"
 fetch_file "version.json" "${INSTALL_DIR}/version.json"
 
 # Copy python modules
@@ -86,15 +89,10 @@ except Exception:
     pass
 EOF
 
-echo -e "${YELLOW}[4/4] Injecting Web UI to PasarGuard Dashboard...${NC}"
-DASHBOARD_HTML="${PASARGUARD_DIR}/dashboard/build/index.html"
-if [[ -f "${DASHBOARD_HTML}" ]]; then
-  # Copy js to statics
-  cp -f "${INSTALL_DIR}/plugin/vpn-panel.js" "${PASARGUARD_DIR}/dashboard/build/vpn-panel.js" 2>/dev/null || true
-  if ! grep -q "vpn-panel.js" "${DASHBOARD_HTML}"; then
-    sed -i 's|</body>|<script src="/vpn-panel.js" defer></script></body>|' "${DASHBOARD_HTML}"
-  fi
-fi
+echo -e "${YELLOW}[4/4] Injecting Web UI to PasarGuard Dashboard (Host & Docker)...${NC}"
+bash "${INSTALL_DIR}/plugin/integrate-dashboard.sh" || {
+  echo -e "${YELLOW}Warning: Automatic dashboard integration skipped, will fallback to manual injection if needed.${NC}"
+}
 
 echo -e "\n${GREEN}======================================================${NC}"
 echo -e "${GREEN}  ✓ PasarGuard Unified VPN installed successfully!   ${NC}"
