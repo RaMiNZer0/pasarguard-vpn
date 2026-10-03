@@ -239,23 +239,23 @@
           </div>
 
           <div class="pg-vpn-btn-group">
+            <a href="${cfg.ovpn_download_url}&proto=tcp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn" style="background: #2563eb; color: #ffffff !important; border: 1px solid #1d4ed8; font-weight: bold;">
+              <span>🛡️</span>
+              <span>دانلود OpenVPN سبک میکروتیک (TCP 443 - ضد فیلتر)</span>
+            </a>
             <a href="${cfg.mobileconfig_download_url}" class="pg-vpn-dl-btn pg-vpn-btn-apple">
               <span>🍏</span>
               <span>نصب مستقیم در آیفون / مک (IKEv2)</span>
             </a>
             <a href="${cfg.ovpn_download_url}&proto=udp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn">
               <span>⚡</span>
-              <span>دانلود OpenVPN (پروتکل UDP - پیش‌فرض)</span>
-            </a>
-            <a href="${cfg.ovpn_download_url}&proto=tcp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn" style="background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
-              <span>🛡️</span>
-              <span>دانلود OpenVPN (پروتکل TCP - پورت 443)</span>
+              <span>دانلود OpenVPN (پروتکل UDP 1194)</span>
             </a>
           </div>
 
           <div class="pg-vpn-creds">
             <div class="pg-vpn-cred-row">
-              <span style="color:#a1a1aa;">آدرس سرور:</span>
+              <span style="color:#a1a1aa;">آدرس سرور (L2TP / IKEv2 / OpenVPN):</span>
               <span>
                 <code>${cfg.server_host}</code>
                 <button class="pg-vpn-copy-btn" data-copy="${cfg.server_host}">کپی</button>
@@ -273,6 +273,13 @@
               <span>
                 <code>${pw ? pw.substring(0, 10) + '...' : '-'}</code>
                 <button class="pg-vpn-copy-btn" data-copy="${pw}">کپی رمز</button>
+              </span>
+            </div>
+            <div class="pg-vpn-cred-row">
+              <span style="color:#a1a1aa;">کلید اشتراکی L2TP (Secret / PSK):</span>
+              <span>
+                <code>PasarGuardVPN123</code>
+                <button class="pg-vpn-copy-btn" data-copy="PasarGuardVPN123">کپی سکرت</button>
               </span>
             </div>
           </div>

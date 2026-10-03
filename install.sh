@@ -170,20 +170,21 @@ bash "${INSTALL_DIR}/plugin/integrate-dashboard.sh" || {
 # Inject vpn-sub.js into subscription template
 SUB_TEMPLATE="/var/lib/pasarguard/templates/subscription/index.html"
 if [[ -f "${SUB_TEMPLATE}" && -f "${INSTALL_DIR}/plugin/vpn-sub.js" ]]; then
-  if ! grep -q "pg-vpn-sub-initialized" "${SUB_TEMPLATE}"; then
-    echo -e "${GREEN}Injecting 1-Click VPN download buttons to user subscription page...${NC}"
-    python3 -c "
+  echo -e "${GREEN}Injecting/Updating 1-Click VPN download buttons to user subscription page...${NC}"
+  python3 -c "
+import re
 with open('${SUB_TEMPLATE}', 'r', encoding='utf-8') as f:
     c = f.read()
 with open('${INSTALL_DIR}/plugin/vpn-sub.js', 'r', encoding='utf-8') as f:
     js_code = f.read()
 script_tag = f'\n<script id=\"pg-vpn-sub-initialized\">\n{js_code}\n</script>\n'
-if '</body>' in c and 'pg-vpn-sub-initialized' not in c:
+if 'id=\"pg-vpn-sub-initialized\"' in c:
+    c = re.sub(r'<script id=\"pg-vpn-sub-initialized\">.*?</script>', script_tag.strip(), c, flags=re.DOTALL)
+elif '</body>' in c:
     c = c.replace('</body>', script_tag + '</body>')
-    with open('${SUB_TEMPLATE}', 'w', encoding='utf-8') as f:
-        f.write(c)
+with open('${SUB_TEMPLATE}', 'w', encoding='utf-8') as f:
+    f.write(c)
 " || true
-  fi
 fi
 
 echo -e "\n${GREEN}======================================================${NC}"
