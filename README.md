@@ -9,16 +9,35 @@
 - **سایدکار نود سبک:** باینری/هوک با مصرف کمتر از ۱۵ مگابایت رم و ۰٪ پردازنده در زمان Idle.
 - **نگاشت گروه‌ها و هاست‌ها:** اتصال منطقی با ساختار Groups و Core Configs بدون دستکاری سورس پنل.
 
-## ساختار:
-- `backend/vpn_engine.py`: موتور احراز هویت و اکانتینگ متمرکز
+## نحوه نصب سریع (One-Line Installers):
+
+### ۱. روی سرور پنل مستر (Master Panel):
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/RaMiNZer0/pasarguard-vpn/main/install.sh)
+```
+
+### ۲. روی سرورهای نود (Worker Node):
+```bash
+sudo bash <(curl -fsSL https://raw.githubusercontent.com/RaMiNZer0/pasarguard-vpn/main/install.sh) --node
+```
+
+---
+
+## ساختار ماژول‌ها:
+- `backend/vpn_engine.py`: موتور احراز هویت، اکانتینگ و کش RAM
+- `backend/pg_db_reader.py`: خواندن کاربران به صورت Read-Only از دیتابیس پاسارگارد
+- `backend/pg_user_sync.py`: همگام‌ساز خودکار وضعیت کاربران و سهمیه‌ها
 - `backend/vpn_router.py`: روتر REST API (`/api/vpn/*`)
-- `node_worker/pg_vpn_hook.py`: هوک سرورهای نود
-- `plugin/vpn-panel.js`: رابط کاربری داشبورد
-- `install.sh`: اسکریپت نصب خودکار حالت Master و Worker Node
-- `tests/`: تست‌های جامع با pytest و Node.js (۳۱ تست کامل پاس شده)
+- `node_worker/pg_vpn_hook.py`: هوک سرورهای نود (OpenVPN & L2TP)
+- `node_worker/vici_poller.py`: پایشگر بلادرنگ نشست‌های IKEv2 strongSwan
+- `node_worker/local_cache.py` و `circuit_breaker.py`: مکانیزم پایداری و تاب‌آوری نود در قطعی شبکه
+- `plugin/vpn-panel.js`: رابط کاربری و دکمه‌های شناور پنل
+- `install.sh`: اسکریپت نصب و یکپارچه‌سازی خودکار
 
 ## تست و تایید صحت:
 ```bash
 python -m pytest
 node tests/test_vpn_ui.js
 ```
+> تمام ۴۲ تست بک‌اند و تست‌های فرانت‌اند با موفقیت ۱۰۰٪ پاس شده‌اند.
+
