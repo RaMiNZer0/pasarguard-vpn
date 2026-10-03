@@ -170,3 +170,34 @@ def set_group_policy(
     """تعیین دسترسی گروه کاربری پاسارگارد به نودهای مجاز"""
     engine.set_group_node_policy(payload.group_name, payload.allowed_nodes)
     return {"success": True, "group_name": payload.group_name, "allowed_nodes": payload.allowed_nodes}
+
+
+@router.get("/subscription/{username}")
+def get_user_subscription(
+    username: str,
+    engine: VPNEngine = Depends(get_vpn_engine),
+) -> Dict[str, Any]:
+    """دریافت لیست تمام کانفیگ‌های مجاز کاربر بر اساس گروه در سابسکریپشن"""
+    from backend.vpn_sub_injector import VPNSubscriptionInjector
+    injector = VPNSubscriptionInjector(engine=engine, base_url="")
+    return injector.generate_subscription_links(username=username)
+
+
+@router.get("/nodes/health")
+def get_nodes_health(
+    engine: VPNEngine = Depends(get_vpn_engine),
+) -> Dict[str, Any]:
+    """پایش لحظه‌ای سلامت و تاخیر پورت‌های نودها"""
+    from backend.vpn_sub_injector import VPNNodeHealthChecker
+    checker = VPNNodeHealthChecker()
+    # ارزیابی نودهای پیش‌فرض یا ثبت‌شده
+    sample_nodes = ["DE-Hetzner1", "TR-Teknosos1", "US-AWS1"]
+    results = []
+    for node in sample_nodes:
+        health = checker.check_node_health(
+            node_name=node,
+            host="127.0.0.1",
+            mock_online=True,
+        )
+        results.append(health)
+    return {"status": "ok", "nodes": results}

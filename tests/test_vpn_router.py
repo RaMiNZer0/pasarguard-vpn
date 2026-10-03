@@ -123,3 +123,22 @@ def test_vpn_group_policy_endpoint(vpn_client):
     policies = res_get.json()
     assert "Standard" in policies
     assert "TR-Teknosos1" in policies["Standard"]
+
+
+def test_vpn_user_subscription_endpoint(vpn_client):
+    """تست دریافت کانفیگ‌های اشتراک کلاینت بر اساس گروه"""
+    res = vpn_client.get("/api/vpn/subscription/test_user")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["username"] == "test_user"
+    assert data["group"] == "VIP"
+    assert len(data["configs"]) == 2  # DE-Hetzner1 and TR-Teknosos1
+
+
+def test_vpn_nodes_health_endpoint(vpn_client):
+    """تست بررسی سلامت نودها"""
+    res = vpn_client.get("/api/vpn/nodes/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert "nodes" in data
+    assert len(data["nodes"]) >= 1
