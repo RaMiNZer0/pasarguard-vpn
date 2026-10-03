@@ -23,9 +23,11 @@ class PasarGuardUserSync:
 
     def __init__(
         self,
-        engine: VPNEngine,
-        db_reader: Optional[PasarGuardDBReader] = None,
+        engine: Any,
+        db_reader: Optional[Any] = None,
     ) -> None:
+        if hasattr(engine, "is_available") and hasattr(db_reader, "authenticate_user"):
+            engine, db_reader = db_reader, engine
         self.engine = engine
         self.db_reader = db_reader or PasarGuardDBReader()
         self._stop_event = threading.Event()

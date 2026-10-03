@@ -48,7 +48,7 @@ def get_vpn_engine() -> VPNEngine:
             from backend.pg_user_sync import PasarGuardUserSync
             reader = PasarGuardDBReader()
             if reader.is_available():
-                syncer = PasarGuardUserSync(reader, _engine_instance)
+                syncer = PasarGuardUserSync(engine=_engine_instance, db_reader=reader)
                 _engine_instance.set_user_syncer(syncer)
                 syncer.sync_all()
         except Exception:
