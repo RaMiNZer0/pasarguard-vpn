@@ -175,24 +175,32 @@ class VPNSubscriptionInjector:
             mobileconfig_url = f"{self.base_url}/api/vpn/client/mobileconfig?node={n_name}&username={username}"
 
             primary_password = user.password or (user.valid_passwords[0] if user.valid_passwords else "")
+            server_ip = n_info.get("address") or pub_host
+            server_domain = n_info.get("public_host") or pub_host
 
             configs.append({
                 "node": n_name,
                 "display_name": display,
-                "server_host": pub_host,
+                "server_host": server_ip,
+                "server_ip": server_ip,
+                "server_domain": server_domain,
                 "protocols": ["openvpn", "ikev2", "l2tp"],
                 "openvpn_port": ovpn_port,
                 "ikev2_port": ikev2_port,
                 "ovpn_download_url": ovpn_url,
                 "mobileconfig_download_url": mobileconfig_url,
                 "credentials": {
-                    "server_address": pub_host,
+                    "server_address": server_ip,
+                    "server_ip": server_ip,
+                    "server_domain": server_domain,
                     "username": username,
                     "password": primary_password,
                     "valid_passwords": user.valid_passwords,
                 },
                 "l2tp_credentials": {
-                    "server_address": pub_host,
+                    "server_address": server_ip,
+                    "server_ip": server_ip,
+                    "server_domain": server_domain,
                     "username": username,
                     "password": primary_password,
                     "psk": os.environ.get("VPN_L2TP_PSK", "PasarGuardVPN123"),

@@ -325,6 +325,7 @@ class OpenVPNClientConfigGenerator:
         ca_cert: str = "",
         tls_crypt_key: str = "",
         cipher: str = "AES-256-GCM",
+        fallback_host: Optional[str] = None,
     ) -> None:
         self.server_host = server_host
         self.server_port = server_port
@@ -332,12 +333,14 @@ class OpenVPNClientConfigGenerator:
         self.ca_cert = ca_cert.strip()
         self.tls_crypt_key = tls_crypt_key.strip()
         self.cipher = cipher
+        self.fallback_host = fallback_host.strip() if fallback_host else None
 
     def generate(self, node_name: str = "PasarGuard-Node") -> str:
-        if self.proto == "udp":
-            remotes = f"remote {self.server_host} {self.server_port}"
-        else:
-            remotes = f"remote {self.server_host} 443"
+        port = 443 if self.proto == "tcp" else self.server_port
+        remotes_list = [f"remote {self.server_host} {port}"]
+        if self.fallback_host and self.fallback_host != self.server_host:
+            remotes_list.append(f"remote {self.fallback_host} {port}")
+        remotes = "\n".join(remotes_list)
 
         tls_crypt_block = ""
         if self.tls_crypt_key:

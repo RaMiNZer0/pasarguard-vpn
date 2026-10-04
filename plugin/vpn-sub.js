@@ -241,7 +241,7 @@
           <div class="pg-vpn-btn-group">
             <a href="${cfg.ovpn_download_url}&proto=tcp" class="pg-vpn-dl-btn pg-vpn-btn-ovpn" style="background: #2563eb; color: #ffffff !important; border: 1px solid #1d4ed8; font-weight: bold;">
               <span>🛡️</span>
-              <span>دانلود OpenVPN سبک میکروتیک (TCP 443 - ضد فیلتر)</span>
+              <span>دانلود OpenVPN ضد فیلتر (TCP 443 - مستقیم)</span>
             </a>
             <a href="${cfg.mobileconfig_download_url}" class="pg-vpn-dl-btn pg-vpn-btn-apple">
               <span>🍏</span>
@@ -255,10 +255,17 @@
 
           <div class="pg-vpn-creds">
             <div class="pg-vpn-cred-row">
-              <span style="color:#a1a1aa;">آدرس سرور (L2TP / IKEv2 / OpenVPN):</span>
+              <span style="color:#a1a1aa;">آدرس IP سرور (مستقیم - بدون نیاز به DNS):</span>
               <span>
-                <code>${cfg.server_host}</code>
-                <button class="pg-vpn-copy-btn" data-copy="${cfg.server_host}">کپی</button>
+                <code>${cfg.credentials?.server_ip || cfg.server_host}</code>
+                <button class="pg-vpn-copy-btn" data-copy="${cfg.credentials?.server_ip || cfg.server_host}">کپی IP</button>
+              </span>
+            </div>
+            <div class="pg-vpn-cred-row">
+              <span style="color:#a1a1aa;">دامنه سرور (اختیاری):</span>
+              <span>
+                <code>${cfg.credentials?.server_domain || cfg.server_host}</code>
+                <button class="pg-vpn-copy-btn" data-copy="${cfg.credentials?.server_domain || cfg.server_host}">کپی دامنه</button>
               </span>
             </div>
             <div class="pg-vpn-cred-row">
@@ -290,8 +297,8 @@
     container.innerHTML = `
       <div class="pg-vpn-header">
         <div class="pg-vpn-title">
-          <span>🛡️ پروتکل‌های مستقیم VPN (سیستم‌عامل و OpenVPN)</span>
-          <span class="pg-vpn-badge">IKEv2 & OpenVPN</span>
+          <span>🛡️ پروتکل‌های مستقیم VPN (OpenVPN و L2TP/IPsec)</span>
+          <span class="pg-vpn-badge">Direct & Anti-Filter</span>
         </div>
         <div style="font-size:12px; color:#a1a1aa;">
           اتصال پرسرعت بدون قطعی به نودهای اختصاصی
@@ -304,8 +311,9 @@
 
       <div class="pg-vpn-help-hint">
         💡 <b>راهنمای اتصال سریع:</b><br>
-        • <b>آیفون و آیپد:</b> دکمه آبی (نصب مستقیم) را بزنید؛ سپس در تنظیمات گوشی به Settings > Profile Downloaded رفته و دکمه Install را بزنید (بدون نیاز به پسورد وصل می‌شود).<br>
-        • <b>اندروید و ویندوز:</b> فایل کانفیگ .ovpn را دانلود کرده و وارد نرم‌افزار <b>OpenVPN Connect</b> کنید و رمز عبور را وارد نمایید.
+        • <b>اتصال با OpenVPN:</b> دکمه آبی (TCP 443 - مستقیم) را دانلود کنید و در نرم‌افزار <b>OpenVPN Connect</b> وارد کرده، نام کاربری و رمز عبور را بزنید.<br>
+        • <b>اتصال مستقیم L2TP (ویندوز / گوشی / میکروتیک):</b> یک کانکشن L2TP/IPsec با آدرس IP مستقیم سرور، نام کاربری، رمز عبور و سکرت (<code>PasarGuardVPN123</code>) بسازید.<br>
+        • <b>آیفون و مک (IKEv2):</b> دکمه سبز (نصب مستقیم) را بزنید و در Settings > Profile Downloaded نصب کنید.
       </div>
     `;
 

@@ -122,7 +122,7 @@ def authenticate(
 
 
 @router.post("/report-usage")
-def report_usage(
+async def report_usage(
     payload: UsageReportRequest,
     engine: VPNEngine = Depends(get_vpn_engine),
     _sec: None = Depends(verify_node_api_key),
@@ -134,6 +134,25 @@ def report_usage(
         bytes_out=payload.bytes_out,
         protocol=payload.protocol,
     )
+
+    # همگام‌سازی بلادرنگ ترافیک با دیتابیس اصلی PostgreSQL پاسارگارد (User.used_traffic)
+    consumed = payload.bytes_in + payload.bytes_out
+    if consumed > 0 and payload.username:
+        try:
+            from app.db import GetDB
+            from app.db.models import User
+            from sqlalchemy import update
+            async with GetDB() as db:
+                await db.execute(
+                    update(User)
+                    .where(User.username == payload.username)
+                    .values(used_traffic=User.used_traffic + consumed)
+                )
+                await db.commit()
+            report["db_updated"] = True
+        except Exception as e:
+            report["db_error"] = str(e)
+
     return report
 
 
@@ -189,14 +208,14 @@ def get_tls_crypt_key() -> str:
 def resolve_node_host(node_name: str) -> str:
     name_clean = node_name.lower().strip()
     direct_map = {
-        "turk": "tur.mobx48.ir",
-        "turkey": "tur.mobx48.ir",
-        "77.83.203.140": "tur.mobx48.ir",
-        "finland": "fin.mobx48.ir",
-        "65.109.217.93": "fin.mobx48.ir",
-        "main": "sub.mob48.ir",
-        "127.0.0.1": "sub.mob48.ir",
-        "91.107.146.13": "sub.mob48.ir",
+        "turk": "77.83.203.140",
+        "turkey": "77.83.203.140",
+        "77.83.203.140": "77.83.203.140",
+        "finland": "65.109.217.93",
+        "65.109.217.93": "65.109.217.93",
+        "main": "91.107.146.13",
+        "127.0.0.1": "91.107.146.13",
+        "91.107.146.13": "91.107.146.13",
     }
     if name_clean in direct_map:
         return direct_map[name_clean]
@@ -210,38 +229,55 @@ def resolve_node_host(node_name: str) -> str:
         nodes = reader.fetch_nodes()
         for n in nodes:
             if n.get("name", "").lower() == name_clean:
-                return n.get("public_host") or n.get("address", "")
+                return n.get("address") or n.get("public_host", "")
     except Exception:
         pass
 
     return f"{name_clean.replace(' ', '-')}.vpn.example.com"
 
 
+def resolve_node_domain(node_name: str) -> str:
+    name_clean = node_name.lower().strip()
+    domain_map = {
+        "turk": "tur.mobx48.ir",
+        "turkey": "tur.mobx48.ir",
+        "77.83.203.140": "tur.mobx48.ir",
+        "finland": "fin.mobx48.ir",
+        "65.109.217.93": "fin.mobx48.ir",
+        "main": "sub.mob48.ir",
+        "91.107.146.13": "sub.mob48.ir",
+    }
+    return domain_map.get(name_clean, "")
+
+
 @router.get("/client/ovpn")
 def download_openvpn_config(
     node: str = Query(..., description="Node name or identifier"),
     username: str = Query(..., description="Username for auth"),
-    proto: str = Query("udp", description="Protocol: udp (port 1194) or tcp (port 443)"),
+    proto: str = Query("tcp", description="Protocol: tcp (port 443) or udp (port 1194)"),
     engine: VPNEngine = Depends(get_vpn_engine),
 ) -> Response:
     """تولید و دانلود مستقیم فایل تک‌فایلی .ovpn با سرتیفیکیت معتبر CA و آدرس واقعی نود"""
-    server_host = resolve_node_host(node)
+    server_ip = resolve_node_host(node)
+    server_domain = resolve_node_domain(node)
     ca_content = get_ca_certificate()
     tls_crypt_content = get_tls_crypt_key()
     generator = OpenVPNClientConfigGenerator(
-        server_host=server_host,
+        server_host=server_ip,
         server_port=1194 if proto == "udp" else 443,
         proto=proto,
         ca_cert=ca_content,
         tls_crypt_key=tls_crypt_content,
         cipher="AES-256-GCM",
+        fallback_host=server_domain,
     )
     content = generator.generate(node_name=node)
 
+    proto_upper = proto.upper()
     return Response(
         content=content,
         media_type="application/x-openvpn-profile",
-        headers={"Content-Disposition": f'attachment; filename="{node}_{proto}.ovpn"'},
+        headers={"Content-Disposition": f'attachment; filename="PasarGuard_{node}_{proto_upper}.ovpn"'},
     )
 
 

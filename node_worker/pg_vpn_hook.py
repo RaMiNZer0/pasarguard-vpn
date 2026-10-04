@@ -141,9 +141,15 @@ def handle_openvpn_disconnect_cli(
 ) -> Dict[str, Any]:
     """هوک قطع اتصال OpenVPN (--client-disconnect) برای کسر ترافیک مصرفی"""
     current_env = env if env is not None else os.environ
-    username = current_env.get("username", "")
+    username = current_env.get("username", "") or current_env.get("common_name", "")
     bytes_in = int(current_env.get("bytes_received", "0"))
     bytes_out = int(current_env.get("bytes_sent", "0"))
+
+    try:
+        with open("/var/log/pg_vpn_hook.log", "a", encoding="utf-8") as log_f:
+            log_f.write(f"[OPENVPN-DISCONNECT] user={username} in={bytes_in} out={bytes_out}\n")
+    except Exception:
+        pass
 
     if engine is not None:
         report = engine.report_traffic(username, bytes_in, bytes_out, protocol="openvpn")
@@ -171,9 +177,15 @@ def handle_l2tp_ip_down_cli(
 ) -> Dict[str, Any]:
     """هوک قطع اتصال L2TP در /etc/ppp/ip-down برای کسر ترافیک مصرفی"""
     current_env = env if env is not None else os.environ
-    username = current_env.get("PEERNAME", "")
+    username = current_env.get("PEERNAME", "") or current_env.get("PPP_IPPARAM", "") or current_env.get("USER", "")
     bytes_in = int(current_env.get("BYTES_RCVD", "0"))
     bytes_out = int(current_env.get("BYTES_SENT", "0"))
+
+    try:
+        with open("/var/log/pg_vpn_hook.log", "a", encoding="utf-8") as log_f:
+            log_f.write(f"[L2TP-DISCONNECT] user={username} in={bytes_in} out={bytes_out}\n")
+    except Exception:
+        pass
 
     if engine is not None:
         return engine.report_traffic(username, bytes_in, bytes_out, protocol="l2tp")
